@@ -1,0 +1,44 @@
+_target_: segsynthtemplate.models.segmentor.Segmentor
+net:
+  _target_:  monai.networks.nets.UNet
+  spatial_dims: 3
+  in_channels: 1
+  channels:
+    - 32
+    - 64
+    - 128
+    - 256
+    - 512
+  out_channels: 10
+  kernel_size: 3
+  up_kernel_size: 3
+  num_res_units: 2
+  act: leakyrelu
+  norm: 'instance'
+  dropout: 0
+  strides:
+    - 2
+    - 2
+    - 2
+    - 2
+optimizer:
+  _target_: torch.optim.Adam
+  _partial_: true
+  weight_decay: 0.0
+
+scheduler:
+  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+  _partial_: true
+  mode: min
+  factor: 0.1
+  patience: 500
+
+criterion:
+  _target_: monai.losses.DiceCELoss
+  to_onehot_y: True
+  include_background: False
+  softmax: True
+
+compile: False
+lr: 0.0001
+num_classes: 10

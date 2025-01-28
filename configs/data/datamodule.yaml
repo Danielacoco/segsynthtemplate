@@ -1,0 +1,20 @@
+defaults:
+  - generator/default
+  - transforms/inference
+
+_target_: segsynthtemplate.data.datamodules.DataModule
+split_file: /path/to/splits.csv
+bids_path: /path/to/bids
+seed_path: /path/to/seeds
+
+train_type: synth # "synth", "real"
+train_split: train
+
+val_type: real # "synth", "real"
+val_split: val # "synth", "real", "test"
+
+# test type always test
+test_split: test
+
+num_workers: 2
+batch_size: 2

@@ -1,0 +1,121 @@
+from typing import Any, Dict, List, Optional, Tuple
+
+import hydra
+import lightning as L
+import rootutils
+import torch
+from lightning import Callback, LightningDataModule, LightningModule, Trainer
+from lightning.pytorch.loggers import Logger
+from omegaconf import DictConfig
+import matplotlib.pyplot as plt
+import numpy as np
+
+rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
+
+from segsynthtemplate.utils import (
+    RankedLogger,
+    extras,
+    get_metric_value,
+    instantiate_callbacks,
+    instantiate_loggers,
+    log_hyperparameters,
+    task_wrapper,
+)
+
+log = RankedLogger(__name__, rank_zero_only=True)
+
+
+@task_wrapper
+def evaldata(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """Trains the model. Can additionally evaluate on a testset, using best weights obtained during
+    training.
+
+    This method is wrapped in optional @task_wrapper decorator, that controls the behavior during
+    failure. Useful for multiruns, saving info about the crash, etc.
+
+    :param cfg: A DictConfig configuration composed by Hydra.
+    :return: A tuple with metrics and dict with all instantiated objects.
+    """
+    # set seed for random number generators in pytorch, numpy and python.random
+    if cfg.get("seed"):
+        L.seed_everything(cfg.seed, workers=True)
+
+    log.info(f"Instantiating model <{cfg.model._target_}>")
+    model: LightningModule = hydra.utils.instantiate(cfg.model)
+
+    if cfg.get("ckpt_path"):
+        log.info(f"Loading model weights from <{cfg.ckpt_path}>")
+        state_dict = torch.load(cfg.ckpt_path)["state_dict"]
+        # remove the last layer of the model
+        state_dict = {
+            k: v for k, v in state_dict.items() if "net.model.2.0.conv" not in k
+        }
+        model.load_state_dict(state_dict, strict=False)
+
+    log.info(f"Instantiating datamodule <{cfg.data._target_}>")
+    datamodule: LightningDataModule = hydra.utils.instantiate(cfg.data)
+
+    print("Train dataset")
+    train_sample = datamodule.train_ds[0]
+    print(
+        f'IMAGE: Type: {type(train_sample["image"])} Dtype: {train_sample["image"].dtype} Shape: {train_sample["image"].shape} Min: {train_sample["image"].min()} Max: {train_sample["image"].max()}'
+    )
+    print(
+        f"LABEL TYPE: {type(train_sample['label'])} Dtype: {train_sample['label'].dtype} SHAPE: {train_sample['label'].shape} Min: {train_sample['label'].min()} Max: {train_sample['label'].max()}"
+    )
+
+    print("Validation dataset")
+    print(
+        f"IMAGE Type: {type(train_sample['image'])} Shape: {train_sample['image'].shape}  Dtype: {train_sample['image'].dtype} Min: {train_sample['image'].min()} Max: {train_sample['image'].max()}"
+    )
+    print(
+        f"LABEL Type: {type(train_sample['label'])} Shape: {train_sample['label'].shape}  Dtype: {train_sample['label'].dtype} Min: {train_sample['label'].min()} Max: {train_sample['label'].max()}"
+    )
+
+    print("Test dataset")
+    test_sample = datamodule.test_ds[0]
+    print(
+        f'IMAGE: Type: {type(test_sample["image"])} Dtype: {test_sample["image"].dtype} Shape: {test_sample["image"].shape} Min: {test_sample["image"].min()} Max: {test_sample["image"].max()}'
+    )
+    print(
+        f"LABEL TYPE: {type(test_sample['label'])} Dtype: {test_sample['label'].dtype} SHAPE: {test_sample['label'].shape} Min: {test_sample['label'].min()} Max: {test_sample['label'].max()}"
+    )
+
+    # plot 3 images and their labels side by side in 3 orientations
+    fig, ax = plt.subplots(6, 3, figsize=(10, 15))
+    for i in range(3):
+        ax[i, 0].imshow(train_sample["image"][0][:, 128, :], cmap="gray")
+        ax[i, 0].set_title("Train Image")
+        ax[i, 1].imshow(train_sample["label"][0][:, 128, :], cmap="gray")
+        ax[i, 1].set_title("Train Label")
+        ax[i, 2].imshow(test_sample["image"][0][:, 128, :], cmap="gray")
+        ax[i, 2].set_title("Test Image")
+
+    for i in range(3):
+        ax[i + 3, 0].imshow(train_sample["image"][0][128, :, :], cmap="gray")
+        ax[i + 3, 1].imshow(train_sample["label"][0][128, :, :], cmap="gray")
+        ax[i + 3, 2].imshow(test_sample["image"][0][128, :, :], cmap="gray")
+
+    # display the plot
+    plt.savefig("data.png")
+
+    return {}, {}
+
+
+@hydra.main(version_base="1.3", config_path="../configs", config_name="train.yaml")
+def main(cfg: DictConfig) -> Optional[float]:
+    """Main entry point for training.
+
+    :param cfg: DictConfig configuration composed by Hydra.
+    :return: Optional[float] with optimized metric value.
+    """
+    # apply extra utilities
+    # (e.g. ask for tags if none are provided in cfg, print cfg tree, etc.)
+    extras(cfg)
+
+    # train the model
+    evaldata(cfg)
+
+
+if __name__ == "__main__":
+    main()

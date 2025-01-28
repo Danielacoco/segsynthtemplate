@@ -1,0 +1,3 @@
+# fetalsyngen local installation
+git+https://github.com/Medical-Image-Analysis-Laboratory/fetalsyngen.git@main#egg=fetalsyngen
+

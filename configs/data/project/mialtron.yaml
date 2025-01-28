@@ -1,0 +1,165 @@
+task_name: eval
+tags:
+- dev
+synth_test_size: 40
+rescale_test: true
+ckpt_path: /media/vzalevskyi/data/thomas_logs/None/logs/tr_CHUV_mial_fabian_test/runs/2024-02-19_21-14-06/checkpoints/epoch_016_val_dsc_0.7475_step_14800.ckpt
+save_predictions: !!python/object/apply:pathlib.PosixPath
+- /
+- media
+- vzalevskyi
+- data
+- FETA_challenge
+- predictions_feta
+- tr_CHUV_mial_fabian_test
+- runs
+- 2024-02-19_21-14-06
+split_file: /mnt/chuv_hpc/projects/fetalSynthSegm/data/splits/feta_splits.csv
+feta_path: /media/vzalevskyi/data/FETA_challenge/merged_feta_spinabifida
+synth_path: /mnt/chuv_hpc/projects/fetSynthGen/data/images/FETA/def_genv1_gm1
+
+data:
+  _target_: src.data.feta_datamodule.FetaDataModule
+  train: feta
+  validate: feta
+  train_split:
+  - CHUV - rec-mial
+  valid_split:
+  - CHUV - rec-mial
+  - KISPI - rec-irtk
+  feta_path: /media/vzalevskyi/data/FETA_challenge/merged_feta_spinabifida
+  synth_path: /mnt/chuv_hpc/projects/fetSynthGen/data/images/FETA/def_genv1_gm1
+  split_file: /mnt/chuv_hpc/projects/fetalSynthSegm/data/splits/feta_splits.csv
+  batch_size: 1
+  num_workers: 10
+  pin_memory: false
+  synth_val_size: 40
+  train_augm:
+    _target_: monai.transforms.Compose
+    transforms:
+    - _target_: monai.transforms.RandAdjustContrastd
+      prob: 0.5
+      keys:
+      - image
+      gamma:
+      - 0.5
+      - 1.5
+    - _target_: monai.transforms.RandAffined
+      prob: 0.5
+      keys:
+      - image
+      - label
+      rotate_range:
+      - -0.2
+      - 0.2
+      scale_range:
+      - 0.1
+      - 0.1
+      translate_range:
+      - -30
+      - 30
+      shear_range:
+      - 0.1
+      - 0.1
+      mode:
+      - bilinear
+      - nearest
+      padding_mode: zeros
+      cache_grid: true
+    - _target_: monai.transforms.RandGaussianNoised
+      prob: 0.5
+      keys:
+      - image
+      mean: 0.0
+      std: 0.1
+    - _target_: monai.transforms.RandGaussianSmoothd
+      keys:
+      - image
+      prob: 0.7
+      sigma_x:
+      - 0.5
+      - 1.5
+      sigma_y:
+      - 0.5
+      - 1.5
+      sigma_z:
+      - 0.5
+      - 1.5
+    - _target_: monai.transforms.ScaleIntensityd
+      keys:
+      - image
+      minv: 0
+      maxv: 1
+  val_augm:
+    _target_: monai.transforms.Compose
+    transforms:
+    - _target_: monai.transforms.ScaleIntensityd
+      keys:
+      - image
+      minv: 0
+      maxv: 1
+  rescale_res: 0.5
+  fabian_path: /media/mial/SSDMISHA/sim-012/data
+
+model:
+  _target_: src.models.UnetModule.Unet
+  lr: 0.001
+  optimizer:
+    _target_: torch.optim.Adam
+    _partial_: true
+    weight_decay: 0.0
+  scheduler:
+    _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+    _partial_: true
+    mode: min
+    factor: 0.1
+    patience: 10
+  net:
+    _target_: monai.networks.nets.UNet
+    spatial_dims: 3
+    in_channels: 1
+    channels:
+    - 32
+    - 64
+    - 128
+    - 256
+    - 512
+    out_channels: 8
+    kernel_size: 3
+    up_kernel_size: 3
+    num_res_units: 0
+    act: leakyrelu
+    norm: instance
+    dropout: 0.0
+    strides:
+    - 2
+    - 2
+    - 2
+    - 2
+  compile: false
+
+trainer:
+  _target_: lightning.pytorch.trainer.Trainer
+  default_root_dir: ${paths.output_dir}
+  min_epochs: 100
+  max_epochs: 500
+  accelerator: gpu
+  devices: 1
+  deterministic: false
+  val_check_interval: 5
+  log_every_n_steps: 10
+  check_val_every_n_epoch: null
+
+paths:
+  root_dir: null
+  data_dir: ${paths.root_dir}/data/
+  log_dir: ${paths.root_dir}/logs/
+  output_dir: ${hydra:runtime.output_dir}
+  work_dir: ${hydra:runtime.cwd}
+
+extras:
+  ignore_warnings: false
+  enforce_tags: true
+  print_config: true
+
+train_split: CHUV - rec-mial
