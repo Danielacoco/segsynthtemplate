@@ -9,7 +9,9 @@ from lightning.pytorch.loggers import Logger
 from omegaconf import DictConfig
 import matplotlib.pyplot as plt
 import numpy as np
+import warnings
 
+warnings.filterwarnings("ignore")
 rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 
 from segsynthtemplate.utils import (
@@ -57,6 +59,8 @@ def evaldata(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
     print("Train dataset")
     train_sample = datamodule.train_ds[0]
+    valid_sample = datamodule.val_ds[0]
+    test_sample = datamodule.test_ds[0]
     print(
         f'IMAGE: Type: {type(train_sample["image"])} Dtype: {train_sample["image"].dtype} Shape: {train_sample["image"].shape} Min: {train_sample["image"].min()} Max: {train_sample["image"].max()}'
     )
@@ -66,38 +70,86 @@ def evaldata(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
     print("Validation dataset")
     print(
-        f"IMAGE Type: {type(train_sample['image'])} Shape: {train_sample['image'].shape}  Dtype: {train_sample['image'].dtype} Min: {train_sample['image'].min()} Max: {train_sample['image'].max()}"
+        f"IMAGE Type: {type(valid_sample['image'])} Shape: {valid_sample['image'].shape}  Dtype: {valid_sample['image'].dtype} Min: {valid_sample['image'].min()} Max: {valid_sample['image'].max()}"
     )
     print(
-        f"LABEL Type: {type(train_sample['label'])} Shape: {train_sample['label'].shape}  Dtype: {train_sample['label'].dtype} Min: {train_sample['label'].min()} Max: {train_sample['label'].max()}"
+        f"LABEL Type: {type(valid_sample['label'])} Shape: {valid_sample['label'].shape}  Dtype: {valid_sample['label'].dtype} Min: {valid_sample['label'].min()} Max: {valid_sample['label'].max()}"
     )
 
     print("Test dataset")
-    test_sample = datamodule.test_ds[0]
     print(
         f'IMAGE: Type: {type(test_sample["image"])} Dtype: {test_sample["image"].dtype} Shape: {test_sample["image"].shape} Min: {test_sample["image"].min()} Max: {test_sample["image"].max()}'
     )
     print(
         f"LABEL TYPE: {type(test_sample['label'])} Dtype: {test_sample['label'].dtype} SHAPE: {test_sample['label'].shape} Min: {test_sample['label'].min()} Max: {test_sample['label'].max()}"
     )
-
+    slicenum = 128
     # plot 3 images and their labels side by side in 3 orientations
     fig, ax = plt.subplots(6, 3, figsize=(10, 15))
-    for i in range(3):
-        ax[i, 0].imshow(train_sample["image"][0][:, 128, :], cmap="gray")
-        ax[i, 0].set_title("Train Image")
-        ax[i, 1].imshow(train_sample["label"][0][:, 128, :], cmap="gray")
-        ax[i, 1].set_title("Train Label")
-        ax[i, 2].imshow(test_sample["image"][0][:, 128, :], cmap="gray")
-        ax[i, 2].set_title("Test Image")
+    # image ax
+    # segm ax
+    ax[0, 0].imshow(train_sample["image"][0, slicenum, :, :], cmap="gray")
+    ax[0, 0].set_title("Train Image")
+    ax[0, 0].axis("off")
+    ax[0, 1].imshow(valid_sample["image"][0, slicenum, :, :], cmap="gray")
+    ax[0, 1].set_title("Validation Image")
+    ax[0, 1].axis("off")
+    ax[0, 2].imshow(test_sample["image"][0, slicenum, :, :], cmap="gray")
+    ax[0, 2].set_title("Test Image")
+    ax[0, 2].axis("off")
+    ax[1, 0].imshow(train_sample["label"][0, slicenum, :, :], cmap="jet")
+    ax[1, 0].set_title("Train Label")
+    ax[1, 0].axis("off")
+    ax[1, 1].imshow(valid_sample["label"][0, slicenum, :, :], cmap="jet")
+    ax[1, 1].set_title("Validation Label")
+    ax[1, 1].axis("off")
+    ax[1, 2].imshow(test_sample["label"][0, slicenum, :, :], cmap="jet")
+    ax[1, 2].set_title("Test Label")
+    ax[1, 2].axis("off")
+    # image cor
+    # segm cor
+    ax[2, 0].imshow(train_sample["image"][0, :, slicenum, :], cmap="gray")
+    ax[2, 0].set_title("Train Image")
+    ax[2, 0].axis("off")
+    ax[2, 1].imshow(valid_sample["image"][0, :, slicenum, :], cmap="gray")
+    ax[2, 1].set_title("Validation Image")
+    ax[2, 1].axis("off")
+    ax[2, 2].imshow(test_sample["image"][0, :, slicenum, :], cmap="gray")
+    ax[2, 2].set_title("Test Image")
+    ax[2, 2].axis("off")
+    ax[3, 0].imshow(train_sample["label"][0, :, slicenum, :], cmap="jet")
+    ax[3, 0].set_title("Train Label")
+    ax[3, 0].axis("off")
+    ax[3, 1].imshow(valid_sample["label"][0, :, slicenum, :], cmap="jet")
+    ax[3, 1].set_title("Validation Label")
+    ax[3, 1].axis("off")
+    ax[3, 2].imshow(test_sample["label"][0, :, slicenum, :], cmap="jet")
+    ax[3, 2].set_title("Test Label")
+    ax[3, 2].axis("off")
+    # image sag
+    # segm sag
+    ax[4, 0].imshow(train_sample["image"][0, :, :, slicenum], cmap="gray")
+    ax[4, 0].set_title("Train Image")
+    ax[4, 0].axis("off")
+    ax[4, 1].imshow(valid_sample["image"][0, :, :, slicenum], cmap="gray")
+    ax[4, 1].set_title("Validation Image")
+    ax[4, 1].axis("off")
+    ax[4, 2].imshow(test_sample["image"][0, :, :, slicenum], cmap="gray")
+    ax[4, 2].set_title("Test Image")
+    ax[4, 2].axis("off")
+    ax[5, 0].imshow(train_sample["label"][0, :, :, slicenum], cmap="jet")
+    ax[5, 0].set_title("Train Label")
+    ax[5, 0].axis("off")
+    ax[5, 1].imshow(valid_sample["label"][0, :, :, slicenum], cmap="jet")
+    ax[5, 1].set_title("Validation Label")
+    ax[5, 1].axis("off")
+    ax[5, 2].imshow(test_sample["label"][0, :, :, slicenum], cmap="jet")
+    ax[5, 2].set_title("Test Label")
+    ax[5, 2].axis("off")
 
-    for i in range(3):
-        ax[i + 3, 0].imshow(train_sample["image"][0][128, :, :], cmap="gray")
-        ax[i + 3, 1].imshow(train_sample["label"][0][128, :, :], cmap="gray")
-        ax[i + 3, 2].imshow(test_sample["image"][0][128, :, :], cmap="gray")
-
+    plt.tight_layout()
     # display the plot
-    plt.savefig("data.png")
+    plt.savefig("data_sample.png")
 
     return {}, {}
 

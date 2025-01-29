@@ -10,10 +10,10 @@ defaults:
   - override /trainer: gpu
 
 # same as filename without extension
-task_name: fdhcp_real_train_noartif
+task_name: fdhcp_synth_train_noartif
 
 data:
-  train_type: real # "synth", "real"
+  train_type: synth # "synth", "real"
   val_type: real # "synth", "real"
 
   generator:
