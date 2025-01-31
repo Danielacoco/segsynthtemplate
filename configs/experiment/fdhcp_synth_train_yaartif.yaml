@@ -1,0 +1,36 @@
+# @package _global_
+
+# to execute this experiment run:
+# python train.py experiment=example
+
+defaults:
+  - override /data: datamodule
+  - override /model: segmentor
+  - override /callbacks: default
+  - override /trainer: gpu
+
+# same as filename without extension
+task_name: fdhcp_synth_train_yaartif
+
+data:
+  train_type: synth # "synth", "real"
+  val_type: real # "synth", "real"
+
+  generator:
+    blur_cortex: null
+  #   simulate_motion: null
+  #   struct_noise: null
+  #   boundaries: null
+
+  split_file: /data/bach/Vlad/data/fetal_dHCP/derivatives/derivatives/splits.csv 
+  bids_path: /data/bach/Vlad/data/fetal_dHCP/derivatives/derivatives/resampled05
+  seed_path: /data/bach/Vlad/data/fetal_dHCP/derivatives/derivatives/seeds
+
+  train_split: train
+  val_split: val # "synth", "real", "test"
+  # test type always test
+  test_split: test
+
+  num_workers: 1
+  batch_size: 1
+
