@@ -89,6 +89,16 @@ class Segmentor(LightningModule):
         self.val_dsc.reset()
         self.val_dsc_best.reset()
 
+    def predict(self, x: torch.Tensor) -> torch.Tensor:
+        """Perform a prediction on a single image.
+
+        :param x: A tensor of a single image.
+        :return: A tensor of predictions.
+        """
+        logits = self.forward(x)
+        preds = torch.argmax(logits, dim=1)
+        return preds
+
     def model_step(
         self, batch: Tuple[torch.Tensor, torch.Tensor]
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -208,7 +218,7 @@ class Segmentor(LightningModule):
         if dataloader_idx == 0:
             # update and log metrics
             self.test_loss(loss)
-            self.test_dsc(preds, targets)
+            test_dsc = self.test_dsc(preds, targets)
             self.log(
                 "test/loss",
                 self.test_loss,
@@ -245,6 +255,7 @@ class Segmentor(LightningModule):
                 prog_bar=True,
                 add_dataloader_idx=False,
             )
+        return preds, test_dsc
 
     def on_validation_epoch_end(self) -> None:
         "Lightning hook that is called when a validation epoch ends."

@@ -1,0 +1,44 @@
+defaults:
+  # important configs defining data and model
+  - data: datamodule
+  - model: segmentor
+  # configs defining logging and callbacks
+  - callbacks: default
+  - logger: wandb
+  - trainer: gpu
+  - paths: default
+  - extras: default
+  - hydra: default
+  - _self_
+
+data:
+  split_file: /home/vzalevskyi/Data/fetal_dHCP/derivatives/splits.csv 
+  bids_path: /home/vzalevskyi/Data/fetal_dHCP/derivatives/resampled05
+  seed_path: /home/vzalevskyi/Data/fetal_dHCP/derivatives/seeds
+
+  num_workers: 12
+  batch_size: 1
+
+save_path: /home/vzalevskyi/Data/fetal_dHCP/predictions
+
+test_splits:
+  - test
+
+metrics:
+  - dice
+  # - hd95th
+
+device: cuda:0
+# passing checkpoint paths is necessary for evaluation
+ckpt_paths:
+  - /home/vzalevskyi/projects/segsynthtemplate/None/logs/fdhcp_real_train_noartif/runs/2025-01-29_13-18-50/checkpoints/epoch_421_val_dsc_0.9050_step_73006.ckpt
+  - /home/vzalevskyi/projects/segsynthtemplate/None/logs/fdhcp_synth_train_noartif/runs/2025-01-28_19-21-38/checkpoints/epoch_327_val_dsc_0.8708_step_56744.ckpt
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+
+task_name: "eval"
+
+tags: ["dev"]

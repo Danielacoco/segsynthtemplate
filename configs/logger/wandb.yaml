@@ -13,4 +13,5 @@ wandb:
   # entity: "" # set to name of your wandb team
   group: ""
   tags: []
+  save_code: True
   job_type: ""
