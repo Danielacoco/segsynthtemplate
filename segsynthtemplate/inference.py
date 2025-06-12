@@ -14,7 +14,6 @@ import nibabel as nib
 import numpy as np
 
 # one hot encode the labels
-import pandas as pd
 
 # suppress warnings
 warnings.filterwarnings("ignore")
@@ -51,7 +50,6 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
     log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
 
-    modelname = cfg.modelname
     with torch.no_grad():
         for ckpt_path in cfg.get("ckpt_paths", []):
             exp_name = ckpt_path.split("/")[-5] + "/" + ckpt_path.split("/")[-3]
@@ -76,26 +74,31 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
                 datamodule: LightningDataModule = hydra.utils.instantiate(cfg.data)
 
                 test_ds = datamodule.test_dataloader().dataset
-                # TODO: Add support for bids datasets with only images
+
                 for tidx in tqdm(range(len(test_ds))):
                     test_data = test_ds[tidx]
                     image = test_data["image"]
-                    label = test_data["label"]
                     name = test_data["name"]
                     # pred
                     pred = model.predict(image.unsqueeze(0).to(cfg.device))
 
-                    pred = monai.data.meta_tensor.MetaTensor(pred).copy_meta_from(label)
+                    pred = monai.data.meta_tensor.MetaTensor(pred).copy_meta_from(image)
                     pred_data = {"label": pred, "image": image}
                     pred_orgi_space = test_ds.reverse_transform(pred_data)
                     # print pred meta dict
                     pred_orgi_space["label"].meta["name"] = name
-                    output_dir = out_pred / f"{name}/anat/"
+                    output_dir = (
+                        out_pred / f"{name}/anat/"
+                        if "ses" not in name
+                        else out_pred
+                        / f"{name.split('_')[0]}/{name.split('_')[1]}/anat/"
+                    )
                     output_dir.mkdir(exist_ok=True, parents=True)
                     nib_image = nib.Nifti1Image(
                         pred_orgi_space["label"][0].cpu().numpy().astype("int8"),
                         affine=pred_orgi_space["image"].meta["affine"],
                     )
+                    modelname = "inference"
                     nib.save(
                         nib_image,
                         output_dir / f"{name}_seg-{modelname}_pred.nii.gz",
