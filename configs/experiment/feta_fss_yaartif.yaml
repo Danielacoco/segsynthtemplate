@@ -10,27 +10,33 @@ defaults:
   - override /trainer: gpu
 
 # same as filename without extension
-task_name: fdhcp_synth_train_yaartif
+task_name: feta_fss_yaartif
 
 data:
   train_type: synth # "synth", "real"
   val_type: real # "synth", "real"
 
-  generator:
-    blur_cortex: null
+  # generator:
+    # blur_cortex: null
   #   simulate_motion: null
   #   struct_noise: null
   #   boundaries: null
 
-  split_file: /data/bach/Vlad/data/fetal_dHCP/derivatives/derivatives/splits.csv 
-  bids_path: /data/bach/Vlad/data/fetal_dHCP/derivatives/derivatives/resampled05
-  seed_path: /data/bach/Vlad/data/fetal_dHCP/derivatives/derivatives/seeds
+  split_file: /media/vzalevskyi/data/FETA_challenge/quality_test/derivatives/quality_test.csv 
+  bids_path: /media/vzalevskyi/data/FETA_challenge/merged_feta_spinabifida/derivatives/resampled05
+  seed_path: /media/vzalevskyi/data/FETA_challenge/merged_feta_spinabifida/derivatives/seeds
 
   train_split: train
-  val_split: val # "synth", "real", "test"
+  val_split: validation # "synth", "real", "test"
   # test type always test
   test_split: test
+
+  
 
   num_workers: 1
   batch_size: 1
 
+model:
+  net:
+    out_channels: 8
+  num_classes: 8

@@ -72,6 +72,7 @@ class Segmentor(LightningModule):
         :param x: A tensor of images.
         :return: A tensor of logits.
         """
+        # print(f"Input shape: {x.shape}")
         return self.net(x)
 
     def predict_step(self, batch, batch_idx, dataloader_idx=None):

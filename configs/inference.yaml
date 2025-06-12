@@ -1,0 +1,103 @@
+defaults:
+  # important configs defining data and model
+  - data: datamodule
+  - model: segmentor
+  # configs defining logging and callbacks
+  - callbacks: default
+  - logger: wandb
+  - trainer: gpu
+  - paths: default
+  - extras: default
+  - hydra: default
+  - _self_
+
+modelname: drifts
+
+model:
+  net:
+    out_channels: 8
+  num_classes: 8
+
+data:
+  # split_file: /media/vzalevskyi/data/FETA_challenge/Final_Validation_Dataset/participants_testvlad.csv 
+  # bids_path: /media/vzalevskyi/data/FETA_challenge/Final_Validation_Dataset/
+  split_file: /media/vzalevskyi/data/CCA/CCA_CHUV/derivatives/srr_copy/participants.csv # /media/vzalevskyi/data/recon_diffechotimes_LF_Busra/participants.csv #/media/vzalevskyi/data/FETA_challenge/quality_test/derivatives/quality_test.csv  # /media/vzalevskyi/data/fetal_dHCP_full/fdHCP_bids/derivatives/T1w_test.csv #/media/vzalevskyi/data/FETA_challenge/Final_Validation_Dataset/participants_testvlad.csv 
+  bids_path: /media/vzalevskyi/data/CCA/CCA_CHUV/derivatives/srr_copy #/media/vzalevskyi/data/FETA_challenge/merged_feta_spinabifida/derivatives/resampled05 #/media/vzalevskyi/data/fetal_dHCP_full/fdHCP_bids/derivatives/resampled05/ # /media/vzalevskyi/data/FETA_challenge/Final_Validation_Dataset/
+  seed_path: null
+
+  num_workers: 12
+  batch_size: 1
+  img_suffix: reoriented_T2w
+  seg_suffix: dseg
+
+
+  transforms:
+    _target_: monai.transforms.Compose
+    transforms:
+      - _target_: monai.transforms.Orientationd
+        keys: ["image", "label"]
+        axcodes: "RAS"
+
+      - _target_: monai.transforms.SignalFillEmptyd
+        keys: ["image", "label"]
+        replacement: 0
+        allow_missing_keys: true
+
+      - _target_: monai.transforms.CropForegroundd
+        keys: ["image", "label"]
+        source_key: "image"
+        allow_smaller: true
+        margin: 0
+        allow_missing_keys: true
+
+      - _target_: monai.transforms.Spacingd
+        keys: ["image", "label"]
+        pixdim: [0.5, 0.5, 0.5]
+        mode: ["bilinear", "nearest"]
+        allow_missing_keys: true
+
+      - _target_: monai.transforms.SpatialPadd
+        keys: ["image", "label"]
+        spatial_size: [256, 256, 256]
+        mode: "constant"
+        allow_missing_keys: true
+
+      - _target_: monai.transforms.CenterSpatialCropd
+        keys: ["image", "label"]
+        roi_size: [256, 256, 256]
+        allow_missing_keys: true
+
+      - _target_: monai.transforms.ScaleIntensityd
+        keys: ["image"]
+        minv: 0
+        maxv: 1
+
+
+save_path: /media/vzalevskyi/data/CCA/CCA_CHUV/derivatives/srr_copy/derivatives/predictions # /media/vzalevskyi/data/recon_diffechotimes_LF_Busra/derivatives # /media/vzalevskyi/data/FETA_challenge/quality_test/derivatives/predictions #/media/vzalevskyi/data/fetal_dHCP_full/fdHCP_bids/derivatives/predictions/ #/media/vzalevskyi/data/FETA_challenge/Final_Validation_Dataset/derivatives/fss_pred
+# save_path: /media/vzalevskyi/data/FETA_challenge/Final_Validation_Dataset/derivatives/fss_pred
+
+test_splits:
+  - test
+
+
+metrics: null
+  # - dice
+  # - hd95th
+  # - vs
+
+device: cuda:0
+# passing checkpoint paths is necessary for evaluation
+ckpt_paths:
+  - /mnt/Home2/projects/segsynthtemplate/None/logs/fetaall_synth_ftreal_interp05/runs/2025-05-20_18-44-49/checkpoints/interp.ckpt
+  # - /mnt/Home2/projects/segsynthtemplate/None/logs/fetaall_synth/runs/2025-05-09_18-19-58/checkpoints/epoch_949_val_dsc_0.8292_step_99750.ckpt
+  # - /mnt/Home2/projects/segsynthtemplate/None/logs/feta_fss_noartif/runs/2025-05-26_10-16-14/checkpoints/epoch_805_val_dsc_0.8305_step_41106.ckpt
+  # - /mnt/Home2/projects/segsynthtemplate/None/logs/feta_fss_yaartif/runs/2025-05-24_16-18-05/checkpoints/epoch_809_val_dsc_0.8242_step_41310.ckpt
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+
+task_name: "eval"
+
+tags: ["dev"]

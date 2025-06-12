@@ -11,28 +11,73 @@ defaults:
   - hydra: default
   - _self_
 
+
+model:
+  net:
+    out_channels: 8
+  num_classes: 8
+
 data:
-  split_file: /home/vzalevskyi/Data/fetal_dHCP/derivatives/splits.csv 
-  bids_path: /home/vzalevskyi/Data/fetal_dHCP/derivatives/resampled05
-  seed_path: /home/vzalevskyi/Data/fetal_dHCP/derivatives/seeds
+  split_file: /media/vzalevskyi/data/FETA_challenge/deletme/participants_testvlad.csv
+  bids_path: /media/vzalevskyi/data/FETA_challenge/deletme/
+  seed_path: null
 
   num_workers: 12
   batch_size: 1
+  img_suffix: T2w
+  seg_suffix: dseg
+  load_segmentations: true
 
-save_path: /home/vzalevskyi/Data/fetal_dHCP/predictions
+  transforms:
+    _target_: monai.transforms.Compose
+    transforms:
+      - _target_: monai.transforms.Orientationd
+        keys: ["image", "label"]
+        axcodes: "RAS"
+
+      - _target_: monai.transforms.SignalFillEmptyd
+        keys: ["image", "label"]
+        replacement: 0
+        allow_missing_keys: true
+
+      - _target_: monai.transforms.Spacingd
+        keys: ["image", "label"]
+        pixdim: [0.5, 0.5, 0.5]
+        mode: ["bilinear", "nearest"]
+        allow_missing_keys: true
+
+      - _target_: monai.transforms.SpatialPadd
+        keys: ["image", "label"]
+        spatial_size: [256, 256, 256]
+        mode: "constant"
+        allow_missing_keys: true
+
+      - _target_: monai.transforms.CenterSpatialCropd
+        keys: ["image", "label"]
+        roi_size: [256, 256, 256]
+        allow_missing_keys: true
+
+      - _target_: monai.transforms.ScaleIntensityd
+        keys: ["image"]
+        minv: 0
+        maxv: 1
+
+
+save_path: /media/vzalevskyi/data/FETA_challenge/deletme/derivatives/predictions
 
 test_splits:
   - test
 
+
 metrics:
   - dice
-  # - hd95th
+  - hd95th
+  - vs
 
 device: cuda:0
-# passing checkpoint paths is necessary for evaluation
+
 ckpt_paths:
-  - /home/vzalevskyi/projects/segsynthtemplate/None/logs/fdhcp_real_train_noartif/runs/2025-01-29_13-18-50/checkpoints/epoch_421_val_dsc_0.9050_step_73006.ckpt
-  - /home/vzalevskyi/projects/segsynthtemplate/None/logs/fdhcp_synth_train_noartif/runs/2025-01-28_19-21-38/checkpoints/epoch_327_val_dsc_0.8708_step_56744.ckpt
+  - /mnt/Home2/projects/segsynthtemplate/None/logs/fetaall_synth_ftreal_interp05/runs/2025-05-20_18-44-49/checkpoints/interp.ckpt
 
 hydra:
   run:

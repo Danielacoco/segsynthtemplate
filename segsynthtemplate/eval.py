@@ -13,6 +13,7 @@ from pathlib import Path
 from tqdm import tqdm
 import nibabel as nib
 from monai.metrics import DiceMetric, compute_hausdorff_distance
+import numpy as np
 
 # one hot encode the labels
 from monai.transforms import AsDiscrete
@@ -55,11 +56,10 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     model: LightningModule = hydra.utils.instantiate(cfg.model)
 
     log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
-    trainer: Trainer = hydra.utils.instantiate(
-        cfg.trainer,
-    )
 
-    dice_metric = DiceMetric(include_background=False, return_with_label=True)
+    dice_metric = DiceMetric(
+        include_background=False,
+    )
     onehoteencoder = AsDiscrete(to_onehot=cfg.model.net.out_channels)
     with torch.no_grad():
         for ckpt_path in cfg.get("ckpt_paths", []):
@@ -71,6 +71,7 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
             # move model to device
             model.to(cfg.device)
             log.info(f"Saving predictions to {cfg.get('output_dir')}")
+            output_dir = Path(cfg["save_path"])
             for test_split in cfg.get("test_splits"):
 
                 log.info(f"Testing {exp_name} on split {test_split}")
@@ -82,93 +83,133 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
                     f"Instantiating datamodule <{cfg.data._target_}> with test split {test_split}"
                 )
                 datamodule: LightningDataModule = hydra.utils.instantiate(cfg.data)
+
                 test_ds = datamodule.test_dataloader().dataset
+
                 testsplit_df = []
                 for tidx in tqdm(range(len(test_ds))):
                     test_data = test_ds[tidx]
                     image = test_data["image"]
                     label = test_data["label"]
                     name = test_data["name"]
-
                     # pred
                     pred = model.predict(image.unsqueeze(0).to(cfg.device))
+                    mean_dice = -1
+                    if cfg.metrics is not None:
+                        pred_1h = onehoteencoder(pred.unsqueeze(0))
+                        gt_1h = onehoteencoder(label.unsqueeze(0).to(cfg.device))
 
-                    pred_1h = onehoteencoder(pred.unsqueeze(0))
-                    gt_1h = onehoteencoder(label.unsqueeze(0).to(cfg.device))
-
-                    # calculate dice
-                    dice = (
-                        dice_metric(
-                            pred_1h,
-                            gt_1h,
-                        )
-                        .cpu()
-                        .numpy()
-                    )
-                    hd95th = (
-                        (
-                            compute_hausdorff_distance(
+                        # calculate dice
+                        dice = (
+                            dice_metric(
                                 pred_1h,
                                 gt_1h,
-                                percentile=95,
-                                include_background=False,
-                                spacing=cfg.data.generator.resolution,
                             )
                             .cpu()
                             .numpy()
+                        )[:]
+
+                        hd95th = (
+                            (
+                                compute_hausdorff_distance(
+                                    pred_1h,
+                                    gt_1h,
+                                    percentile=95,
+                                    include_background=False,
+                                    spacing=cfg.data.generator.resolution,
+                                )
+                                .cpu()
+                                .numpy()
+                            )
+                            if "hd95th" in cfg.metrics
+                            else None
                         )
-                        if "hd95th" in cfg.metrics
-                        else None
-                    )
-                    mean_dice = dice[1:].mean()
+                        mean_dice = dice[:].mean()
 
                     pred = monai.data.meta_tensor.MetaTensor(pred).copy_meta_from(label)
                     pred_data = {"label": pred, "image": image}
-                    pred = test_ds.reverse_transform(pred_data)
+                    pred_orgi_space = test_ds.reverse_transform(pred_data)
                     # print pred meta dict
-                    pred_data["label"].meta["name"] = name
-                    output_dir = out_pred / f"{name}/anat/"
+                    pred_orgi_space["label"].meta["name"] = name
+                    output_dir = (
+                        out_pred / f"{name}/anat/"
+                        if "ses" not in name
+                        else out_pred
+                        / f"{name.split('_')[0]}/{name.split('_')[1]}/anat/"
+                    )
                     output_dir.mkdir(exist_ok=True, parents=True)
                     nib_image = nib.Nifti1Image(
-                        pred_data["label"][0].cpu().numpy().astype("int8"),
-                        affine=pred_data["label"].meta["affine"],
+                        pred_orgi_space["label"][0].cpu().numpy().astype("int8"),
+                        affine=pred_orgi_space["image"].meta["affine"],
                     )
                     nib.save(
                         nib_image,
                         output_dir / f"{name}_dcs-{mean_dice:.3f}_pred.nii.gz",
                     )
-                    subj_res = [
-                        {
-                            "Metric": "DSC",
-                            "Value": dice[x][0],
-                            "subj": name,
-                            "Label": x,
-                            "Split": test_split,
-                            "Exp": exp_name,
-                        }
-                        for x in range(1, len(dice))
-                    ]
-                    subj_res_hd = (
-                        [
+                    if cfg.metrics is not None:
+                        subj_res = [
                             {
-                                "Metric": "HD95",
-                                "Value": hd95th[x][0],
-                                "subj": name,
+                                "Metric": "DSC",
+                                "Value": dice[x][0],
+                                "subj": name.split("_")[0],
                                 "Label": x,
                                 "Split": test_split,
-                                "Exp": exp_name,
+                                "Exp": exp_name.split("/")[0],
+                                "Session": name.split("_")[1] if "ses-" in name else "",
                             }
-                            for x in range(1, len(hd95th))
+                            for x in range(1, len(dice))
                         ]
-                        if "hd95th" in cfg.metrics
-                        else []
-                    )
-                    testsplit_df.extend(subj_res + subj_res_hd)
+                        subj_res_hd = (
+                            [
+                                {
+                                    "Metric": "HD95",
+                                    "Value": hd95th[x][0],
+                                    "subj": name.split("_")[0],
+                                    "Label": x,
+                                    "Split": test_split,
+                                    "Exp": exp_name.split("/")[0],
+                                    "Session": (
+                                        name.split("_")[1] if "ses-" in name else ""
+                                    ),
+                                }
+                                for x in range(1, len(hd95th))
+                            ]
+                            if "hd95th" in cfg.metrics
+                            else []
+                        )
+
+                        # save GT and pred volumes and their volume similarity
+                        subj_res_vs = []
+                        if "vs" in cfg.metrics:
+                            for lab in range(1, cfg.model.net.out_channels):
+                                lab_volume = np.sum(label.cpu().numpy() == lab)
+                                pred_volume = np.sum(pred.cpu().numpy() == lab)
+
+                                # scale by voxel size
+                                lab_volume *= np.prod(cfg.data.generator.resolution)
+                                pred_volume *= np.prod(cfg.data.generator.resolution)
+
+                                subj_res_vs.append(
+                                    {
+                                        "Metric": "VS_GT_Pred",
+                                        "Value": [lab_volume, pred_volume],
+                                        "subj": name.split("_")[0],
+                                        "Label": lab,
+                                        "Split": test_split,
+                                        "Exp": exp_name.split("/")[0],
+                                        "Session": (
+                                            name.split("_")[1] if "ses-" in name else ""
+                                        ),
+                                    }
+                                )
+
+                    testsplit_df.extend(subj_res + subj_res_hd + subj_res_vs)
 
                 testsplit_df = pd.DataFrame(testsplit_df)
 
                 testsplit_df.to_csv(
-                    output_dir.parent.parent / "metrics.csv", index=False
+                    out_pred / "metrics_respace.csv",
+                    index=False,
                 )
                 experiment_mean_dsc = testsplit_df[testsplit_df["Metric"] == "DSC"][
                     "Value"

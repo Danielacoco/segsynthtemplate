@@ -10,7 +10,7 @@ defaults:
   - override /trainer: gpu
 
 # same as filename without extension
-task_name: fdhcp_synth_train_noartif
+task_name: feta_fss_noartif
 
 data:
   train_type: synth # "synth", "real"
@@ -22,15 +22,21 @@ data:
     struct_noise: null
     blur_cortex: null
 
-  split_file: /home/vzalevskyi/Data/fetal_dHCP/derivatives/splits.csv 
-  bids_path: /home/vzalevskyi/Data/fetal_dHCP/derivatives/resampled05
-  seed_path: /home/vzalevskyi/Data/fetal_dHCP/derivatives/seeds
+  split_file: /media/vzalevskyi/data/FETA_challenge/quality_test/derivatives/quality_test.csv 
+  bids_path: /media/vzalevskyi/data/FETA_challenge/merged_feta_spinabifida/derivatives/resampled05
+  seed_path: /media/vzalevskyi/data/FETA_challenge/merged_feta_spinabifida/derivatives/seeds
 
   train_split: train
-  val_split: val # "synth", "real", "test"
+  val_split: validation # "synth", "real", "test"
   # test type always test
   test_split: test
 
   num_workers: 2
   batch_size: 1
 
+model:
+  net:
+    out_channels: 8
+  num_classes: 8
+
+ckpt_path: /mnt/Home2/projects/segsynthtemplate/None/logs/feta_fss_noartif/runs/2025-05-24_14-22-48/checkpoints/last.ckpt

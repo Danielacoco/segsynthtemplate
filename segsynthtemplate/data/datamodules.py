@@ -1,6 +1,5 @@
 import lightning as L
 from torch.utils.data import DataLoader
-from torchvision import transforms
 from fetalsyngen.data.datasets import FetalTestDataset, FetalSynthDataset, FetalSynthGen
 import pandas as pd
 import monai
@@ -23,8 +22,13 @@ class DataModule(L.LightningDataModule):
         transforms: monai.transforms.Compose,
         num_workers: int = 1,
         batch_size: int = 1,
+        img_suffix: str = "T2w",
+        seg_suffix: str = "dseg",
+        load_segmentations: bool = True,
     ):
         super().__init__()
+        self.img_suffix = img_suffix
+        self.seg_suffix = seg_suffix
         self.split_file = split_file
         self.bids_path = bids_path
         self.seed_path = seed_path
@@ -37,6 +41,7 @@ class DataModule(L.LightningDataModule):
         self.num_workers = num_workers
         self.batch_size = batch_size
         self.transform = transforms
+        self.load_segmentations = load_segmentations
         assert self.train_type in ["synth", "real"]
         assert self.val_type in ["synth", "real", "test"]
 
@@ -53,6 +58,8 @@ class DataModule(L.LightningDataModule):
                 load_image=False,
                 image_as_intensity=False,
                 generator=self.generator,
+                img_suffix=self.img_suffix,
+                seg_suffix=self.seg_suffix,
             )
         elif self.train_type == "real":
             self.train_ds = FetalSynthDataset(
@@ -62,6 +69,8 @@ class DataModule(L.LightningDataModule):
                 load_image=True,
                 image_as_intensity=True,
                 generator=self.generator,
+                img_suffix=self.img_suffix,
+                seg_suffix=self.seg_suffix,
             )
 
         if self.val_type == "synth":
@@ -73,6 +82,8 @@ class DataModule(L.LightningDataModule):
                 load_image=False,
                 image_as_intensity=False,
                 generator=self.generator,
+                img_suffix=self.img_suffix,
+                seg_suffix=self.seg_suffix,
             )
         elif self.val_type == "real":
             self.val_ds = FetalSynthDataset(
@@ -82,18 +93,25 @@ class DataModule(L.LightningDataModule):
                 load_image=True,
                 image_as_intensity=True,
                 generator=self.generator,
+                img_suffix=self.img_suffix,
+                seg_suffix=self.seg_suffix,
             )
         elif self.val_type == "test":
             self.val_ds = FetalTestDataset(
                 bids_path=self.bids_path,
                 sub_list=self.val_subjects,
                 transforms=self.transform,
+                img_suffix=self.img_suffix,
+                seg_suffix=self.seg_suffix,
             )
 
         self.test_ds = FetalTestDataset(
             bids_path=self.bids_path,
             sub_list=self.test_subjects,
             transforms=self.transform,
+            img_suffix=self.img_suffix,
+            seg_suffix=self.seg_suffix,
+            load_segmentations=self.load_segmentations,
         )
         # log dataset size
         logging.info(f"Train dataset size: {len(self.train_ds)}")
