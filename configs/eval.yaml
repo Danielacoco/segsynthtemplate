@@ -14,18 +14,18 @@ defaults:
 
 model:
   net:
-    out_channels: 8
-  num_classes: 8
+    out_channels: 15
+  num_classes: 15
 
 data:
-  split_file: /media/vzalevskyi/data/FETA_challenge/deletme/participants_testvlad.csv
-  bids_path: /media/vzalevskyi/data/FETA_challenge/deletme/
+  split_file: /media/vzalevskyi/data/neonatal_dHCP/derivatives/splits/participants.csv
+  bids_path: /media/vzalevskyi/data/neonatal_dHCP/derivatives/resampled05
   seed_path: null
 
   num_workers: 12
   batch_size: 1
   img_suffix: T2w
-  seg_suffix: dseg
+  seg_suffix: seg-fetalisa_dseg
   load_segmentations: true
 
   transforms:
@@ -63,10 +63,10 @@ data:
         maxv: 1
 
 
-save_path: /media/vzalevskyi/data/FETA_challenge/deletme/derivatives/predictions
+save_path: /media/vzalevskyi/data/neonatal_dHCP/derivatives/predictions
 
 test_splits:
-  - test
+  - val
 
 
 metrics:
@@ -77,7 +77,7 @@ metrics:
 device: cuda:0
 
 ckpt_paths:
-  - /mnt/Home2/projects/segsynthtemplate/None/logs/fetaall_synth_ftreal_interp05/runs/2025-05-20_18-44-49/checkpoints/interp.ckpt
+  - /mnt/Home2/projects/segsynthtemplate/None/logs/dhcp_lisafeta_t2w_synth/runs/2025-06-13_17-28-48/checkpoints/epoch_243_val_dsc_0.7084_step_199104.ckpt
 
 hydra:
   run:

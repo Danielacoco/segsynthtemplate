@@ -1,0 +1,99 @@
+defaults:
+  # important configs defining data and model
+  - data: datamodule
+  - model: segmentor
+  # configs defining logging and callbacks
+  - callbacks: default
+  - logger: wandb
+  - trainer: gpu
+  - paths: default
+  - extras: default
+  - hydra: default
+  - _self_
+
+
+model:
+  net:
+    out_channels: 8
+  num_classes: 8
+
+data:
+  split_file: /media/vzalevskyi/data/fetal_dHCP_full/fdHCP_bids/derivatives/splits.csv
+  bids_path: /media/vzalevskyi/data/fetal_dHCP_full/fdHCP_bids/derivatives/resampled05
+  seed_path: null
+
+  num_workers: 12
+  batch_size: 1
+  img_suffix: T2w
+  seg_suffix: feta_dseg_dseg
+  load_segmentations: true
+
+  transforms:
+    _target_: monai.transforms.Compose
+    transforms:
+      - _target_: monai.transforms.Orientationd
+        keys: ["image", "label"]
+        axcodes: "RAS"
+
+      - _target_: monai.transforms.SignalFillEmptyd
+        keys: ["image", "label"]
+        replacement: 0
+        allow_missing_keys: true
+
+      - _target_: monai.transforms.Spacingd
+        keys: ["image", "label"]
+        pixdim: [0.5, 0.5, 0.5]
+        mode: ["bilinear", "nearest"]
+        allow_missing_keys: true
+
+      - _target_: monai.transforms.SpatialPadd
+        keys: ["image", "label"]
+        spatial_size: [256, 256, 256]
+        mode: "constant"
+        allow_missing_keys: true
+
+      - _target_: monai.transforms.CenterSpatialCropd
+        keys: ["image", "label"]
+        roi_size: [256, 256, 256]
+        allow_missing_keys: true
+
+      - _target_: monai.transforms.ScaleIntensityd
+        keys: ["image"]
+        minv: 0
+        maxv: 1
+
+
+save_path: /media/vzalevskyi/data/fetal_dHCP_full/fdHCP_bids/derivatives/predictions/drifts_interp_predicitons
+
+test_splits:
+  - test
+
+
+metrics:
+  - dice
+  - hd95th
+  - vs
+
+device: cuda:0
+
+ckpt_paths:
+  - /mnt/Home2/projects/segsynthtemplate/None/logs/fetaall_synth_ftreal_interp0/runs/2025-05-20_18-44-49/checkpoints/interp0.ckpt
+  # - /mnt/Home2/projects/segsynthtemplate/None/logs/fetaall_synth_ftreal_interp1/runs/2025-05-20_18-44-49/checkpoints/interp1.ckpt
+  # - /mnt/Home2/projects/segsynthtemplate/None/logs/fetaall_synth_ftreal_interp2/runs/2025-05-20_18-44-49/checkpoints/interp2.ckpt
+  # - /mnt/Home2/projects/segsynthtemplate/None/logs/fetaall_synth_ftreal_interp3/runs/2025-05-20_18-44-49/checkpoints/interp3.ckpt
+  # - /mnt/Home2/projects/segsynthtemplate/None/logs/fetaall_synth_ftreal_interp4/runs/2025-05-20_18-44-49/checkpoints/interp4.ckpt
+  # - /mnt/Home2/projects/segsynthtemplate/None/logs/fetaall_synth_ftreal_interp5/runs/2025-05-20_18-44-49/checkpoints/interp5.ckpt
+  # - /mnt/Home2/projects/segsynthtemplate/None/logs/fetaall_synth_ftreal_interp6/runs/2025-05-20_18-44-49/checkpoints/interp6.ckpt
+  # - /mnt/Home2/projects/segsynthtemplate/None/logs/fetaall_synth_ftreal_interp7/runs/2025-05-20_18-44-49/checkpoints/interp7.ckpt
+  # - /mnt/Home2/projects/segsynthtemplate/None/logs/fetaall_synth_ftreal_interp8/runs/2025-05-20_18-44-49/checkpoints/interp8.ckpt
+  # - /mnt/Home2/projects/segsynthtemplate/None/logs/fetaall_synth_ftreal_interp9/runs/2025-05-20_18-44-49/checkpoints/interp9.ckpt
+  - /mnt/Home2/projects/segsynthtemplate/None/logs/fetaall_synth_ftreal_interp10/runs/2025-05-20_18-44-49/checkpoints/interp10.ckpt
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+
+task_name: "eval"
+
+tags: ["dev"]

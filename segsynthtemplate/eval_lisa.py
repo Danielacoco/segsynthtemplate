@@ -60,7 +60,7 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     dice_metric = DiceMetric(
         include_background=False,
     )
-    onehoteencoder = AsDiscrete(to_onehot=cfg.model.net.out_channels)
+    onehoteencoder = AsDiscrete(to_onehot=9)
     with torch.no_grad():
         for ckpt_path in cfg.get("ckpt_paths", []):
             exp_name = ckpt_path.split("/")[-5] + "/" + ckpt_path.split("/")[-3]
@@ -94,9 +94,11 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
                     name = test_data["name"]
                     # pred
                     pred = model.predict(image.unsqueeze(0).to(cfg.device))
+                    pred_lisa = pred * 1
+                    pred_lisa[pred_lisa > 8] = 0
                     mean_dice = -1
                     if cfg.metrics is not None:
-                        pred_1h = onehoteencoder(pred.unsqueeze(0))
+                        pred_1h = onehoteencoder(pred_lisa.unsqueeze(0))
                         gt_1h = onehoteencoder(label.unsqueeze(0).to(cfg.device))
 
                         # calculate dice
@@ -142,9 +144,43 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
                         pred_orgi_space["label"][0].cpu().numpy().astype("int8"),
                         affine=pred_orgi_space["image"].meta["affine"],
                     )
+                    nib_image_lisa = nib_image.get_fdata() * 1
+                    nib_image_lisa[nib_image_lisa > 8] = 0
+
+                    nib_image_feta = nib_image.get_fdata() * 1
+                    nib_image_feta[(nib_image_lisa == 6) | (nib_image_lisa == 8)] = 6
+                    nib_image_feta[(nib_image_lisa == 5) | (nib_image_lisa == 7)] = 6
+                    nib_image_feta[(nib_image_lisa == 3) | (nib_image_lisa == 4)] = 4
+                    nib_image_feta[(nib_image_lisa == 1) | (nib_image_lisa == 2)] = 3
+                    nib_image_feta[nib_image_feta == 14] = 15
+                    nib_image_feta[nib_image_feta == 13] = 14
+                    nib_image_feta[nib_image_feta == 12] = 13
+                    nib_image_feta[nib_image_feta > 8] = (
+                        nib_image_feta[nib_image_feta > 8] - 8
+                    )
+
+                    nib_image_lisa = nib.Nifti1Image(
+                        nib_image_lisa.astype("int8"),
+                        affine=nib_image.affine,
+                    )
+
+                    nib_image_feta = nib.Nifti1Image(
+                        nib_image_feta.astype("int8"),
+                        affine=nib_image.affine,
+                    )
+                    nib.save(
+                        nib_image_lisa,
+                        output_dir / f"{name}_dcs-{mean_dice:.3f}_seg-lisa_pred.nii.gz",
+                    )
+
                     nib.save(
                         nib_image,
-                        output_dir / f"{name}_dcs-{mean_dice:.3f}_pred.nii.gz",
+                        output_dir / f"{name}_seg-fetalisa_pred.nii.gz",
+                    )
+
+                    nib.save(
+                        nib_image_feta,
+                        output_dir / f"{name}_dcs-seg-feta_pred.nii.gz",
                     )
                     if cfg.metrics is not None:
                         subj_res = [
@@ -181,7 +217,7 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
                         # save GT and pred volumes and their volume similarity
                         subj_res_vs = []
                         if "vs" in cfg.metrics:
-                            for lab in range(1, cfg.model.net.out_channels):
+                            for lab in range(1, 9):
                                 lab_volume = np.sum(label.cpu().numpy() == lab)
                                 pred_volume = np.sum(pred.cpu().numpy() == lab)
 
@@ -221,7 +257,7 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     return {}, {}
 
 
-@hydra.main(version_base="1.3", config_path="../configs", config_name="evaldrifts.yaml")
+@hydra.main(version_base="1.3", config_path="../configs", config_name="eval_lisa.yaml")
 def main(cfg: DictConfig) -> Optional[float]:
     """Main entry point for training.
 

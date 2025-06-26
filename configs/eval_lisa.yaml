@@ -11,7 +11,6 @@ defaults:
   - hydra: default
   - _self_
 
-modelname: drifts
 
 model:
   net:
@@ -23,12 +22,11 @@ data:
   bids_path: /media/vzalevskyi/data/LISA2025/bids/derivatives/task2_LFsegm
   seed_path: null
 
-
   num_workers: 12
   batch_size: 1
   img_suffix: T2w
-  seg_suffix: null
-  load_segmentations: false
+  seg_suffix: dseg
+  load_segmentations: true
 
   transforms:
     _target_: monai.transforms.Compose
@@ -36,7 +34,6 @@ data:
       - _target_: monai.transforms.Orientationd
         keys: ["image", "label"]
         axcodes: "RAS"
-        allow_missing_keys: true
 
       - _target_: monai.transforms.SignalFillEmptyd
         keys: ["image", "label"]
@@ -45,7 +42,7 @@ data:
 
       - _target_: monai.transforms.Spacingd
         keys: ["image", "label"]
-        pixdim: [0.5, 0.5, 0.5]
+        pixdim: [1, 1, 1]
         mode: ["bilinear", "nearest"]
         allow_missing_keys: true
 
@@ -72,8 +69,13 @@ test_splits:
   - test
 
 
+metrics:
+  - dice
+  - hd95th
+  - vs
+
 device: cuda:0
-# passing checkpoint paths is necessary for evaluation
+
 ckpt_paths:
   - /mnt/Home2/projects/segsynthtemplate/None/logs/bobs_lisafeta_t2w_synth/runs/2025-06-17_11-34-54/checkpoints/epoch_903_val_dsc_0.6672_step_59664.ckpt
 
