@@ -1,0 +1,71 @@
+# @package _global_
+
+# to execute this experiment run:
+# python train.py experiment=example
+
+defaults:
+  - override /data: datamodule
+  - override /model: segmentor
+  - override /callbacks: default
+  - override /trainer: gpu
+
+# same as filename without extension
+task_name: lisaft_dhcplisaFETAtr_t2w_synth 
+
+model:
+  net:
+    out_channels: 9
+  num_classes: 9
+
+
+
+data:
+  train_type: real # "synth", "real"
+  val_type: real # "synth", "real"
+
+  img_suffix: T2w
+  seg_suffix: dseg
+
+
+  generator:
+    resolution: [1.0, 1.0, 1.0]
+    shape: [256, 256, 256]
+    spatial_deform:
+      flip_prb: 0
+      nonlinear_transform: false
+
+    intensity_generator:
+      min_subclusters: 3
+      max_subclusters: 9
+
+    resampler:
+      prob: 0.0
+      min_resolution: 3
+      max_resolution: 5.5
+
+    simulate_motion: null
+    boundaries: null
+    struct_noise: null
+    blur_cortex: null
+
+
+  split_file: /home/vzalevskyi/Desktop/Data/LISA2025/bids/derivatives/splits/testall.csv
+  bids_path: /home/vzalevskyi/Desktop/Data/LISA2025/bids/derivatives/padded256
+  seed_path: null
+
+  train_split: test
+  val_split: val # "synth", "real", "test"
+  # test type always test
+  test_split: test
+
+  num_workers: 1
+  batch_size: 1
+
+trainer:
+  log_every_n_steps: null
+
+logger:
+  wandb:
+    project: lisa
+
+ckpt_path: /home/vzalevskyi/projects/segsynthtemplate/None/logs/dhcp_lisafeta_t2w_synth/runs/2025-06-13_17-28-48/checkpoints/epoch_243_val_dsc_0.7084_step_199104.ckpt

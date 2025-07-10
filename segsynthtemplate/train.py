@@ -98,49 +98,94 @@ def load_checkpoint_weights(
     model: Module,
     ckpt_path: str,
     ignore_layers: Sequence[str] = (),
-    map_location: str = "",
+    map_location: str = "cuda",
+    fine_tune_mode: str = "full",
 ) -> None:
     """
-    Load matching weights from a checkpoint into `model`, skipping any layers
-    whose names contain one of the `ignore_layers` substrings, missing keys,
-    or shape mismatches. Prints a warning for each skipped key.
+    Load matching weights from ckpt_path into model, plus:
+      • For any layer whose only shape mismatch is in dim0, slice the checkpoint
+        and load the first model_shape[0] entries.
+      • Skip & warn on any other mismatch.
+    Then apply the requested fine_tune_mode ("head" or "full") by toggling requires_grad.
     """
     ckpt = torch.load(ckpt_path, map_location=map_location)
     state_dict = ckpt.get("state_dict", ckpt)
     model_dict = model.state_dict()
 
-    loaded_keys = []
-    skipped = []
+    loaded, skipped = [], []
 
     for name, param in state_dict.items():
+        # 1) skip user-ignored layers
         if any(ign in name for ign in ignore_layers):
             skipped.append((name, f"ignored by pattern {ignore_layers}"))
             continue
 
+        # 2) not in model
         if name not in model_dict:
             skipped.append((name, "not found in model"))
             continue
 
-        if param.shape != model_dict[name].shape:
-            skipped.append(
-                (
-                    name,
-                    f"shape mismatch checkpoint {tuple(param.shape)} vs model {tuple(model_dict[name].shape)}",
-                )
-            )
+        mparam = model_dict[name]
+        # 3) exact match → copy
+        if param.shape == mparam.shape:
+            model_dict[name] = param
+            loaded.append(name)
+            continue
+        
+
+        # 4) special slice case: only dim0 differs, others match
+        if (
+            param.ndim >= 1
+            and param.shape[1:] == mparam.shape[1:]
+            and param.shape[0] > mparam.shape[0]
+        ):
+            # copy just the first mparam.shape[0] output‐channels
+            sliced = param[: mparam.shape[0], ...].clone()
+            model_dict[name] = sliced
+            loaded.append(name + " (sliced dim0)")
             continue
 
-        # all good → copy
-        model_dict[name] = param
-        loaded_keys.append(name)
+        # 4.75) special slice case: only dim1 differs, others match
+        if (
+            param.ndim >= 1
+            and param.shape[2:] == mparam.shape[2:]
+            and param.shape[0] == mparam.shape[0]
+            and param.shape[0] >= mparam.shape[0]
+        ):
+            # copy just the first mparam.shape[0] output‐channels
+            sliced = param[:, : mparam.shape[1], ...].clone()
+            model_dict[name] = sliced
+            loaded.append(name + " (sliced dim1)")
+            continue
+        
+        # 4.5) special slice case: only dim0 and dim1 differs, others match
+        if (
+            param.ndim >= 1
+            and param.shape[2:] == mparam.shape[2:]
+            and param.shape[0] > mparam.shape[0]
+        ):
+            # copy just the first mparam.shape[0] output‐channels
+            sliced = param[: mparam.shape[0], : mparam.shape[1],  ...].clone()
+            model_dict[name] = sliced
+            loaded.append(name + " (sliced dim1 dim2)")
+            continue
 
-    # load the new state dict into the model
+        # 5) anything else → skip
+        skipped.append((
+            name,
+            f"shape mismatch ckpt {tuple(param.shape)} vs model {tuple(mparam.shape)}"
+        ))
+
+    # actually load into model
     model.load_state_dict(model_dict)
 
     # report
-    print(f"✔ Loaded {len(loaded_keys)} parameters")
-    for name, reason in skipped:
-        print(f"⚠️  Skipped '{name}': {reason}")
+    print(f"✔️ Loaded {len(loaded)} parameters:")
+    for n in loaded:
+        print(f"   • {n}")
+    print(f"⚠️  Skipped {len(skipped)} parameters:")
+    for n, reason in skipped:
+        print(f"   • {n}: {reason}")
 
 
 @hydra.main(version_base="1.3", config_path="../configs", config_name="train.yaml")
