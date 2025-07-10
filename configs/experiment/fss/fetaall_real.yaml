@@ -1,0 +1,41 @@
+# @package _global_
+
+# to execute this experiment run:
+# python train.py experiment=example
+
+defaults:
+  - override /data: datamodule
+  - override /model: segmentor
+  - override /callbacks: default
+  - override /trainer: gpu
+
+# same as filename without extension
+task_name: fetaall_real
+
+model:
+  net:
+    out_channels: 8
+  num_classes: 8
+
+data:
+  train_type: real # "synth", "real"
+  val_type: real # "synth", "real"
+
+  # generator:
+  #   simulate_motion: null
+  #   boundaries: null
+  #   struct_noise: null
+  #   blur_cortex: null
+
+  split_file: /media/vzalevskyi/data/FETA_challenge/merged_feta_spinabifida/merged_participants_meta_vienna.csv
+  bids_path: /media/vzalevskyi/data/FETA_challenge/merged_feta_spinabifida/derivatives/resampled05
+  seed_path: /media/vzalevskyi/data/FETA_challenge/merged_feta_spinabifida/derivatives/seeds
+  train_split: feta_train
+  val_split: feta_val # "synth", "real", "test"
+  # test type always test
+  test_split: test
+
+  num_workers: 1
+  batch_size: 1
+  
+# ckpt_path: /home/vzalevskyi/projects/segsynthtemplate/None/logs/fetaall_synth/runs/2025-05-07_19-27-37/checkpoints/last.ckpt

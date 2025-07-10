@@ -1,0 +1,87 @@
+defaults:
+  # important configs defining data and model
+  - data: datamodule
+  - model: segmentor
+  # configs defining logging and callbacks
+  - callbacks: default
+  - logger: wandb
+  - trainer: gpu
+  - paths: default
+  - extras: default
+  - hydra: default
+  - _self_
+
+modelname: drifts
+
+model:
+  net:
+    out_channels: 9
+  num_classes: 9
+
+data:
+  split_file: /media/vzalevskyi/data/LISA2025/bids/derivatives/splits/lisaval.csv
+  bids_path: /media/vzalevskyi/data/LISA2025/bids/derivatives/task2_LFsegm
+  seed_path: null
+
+
+  num_workers: 12
+  batch_size: 1
+  img_suffix: T2w
+  seg_suffix: null
+  load_segmentations: false
+
+  transforms:
+    _target_: monai.transforms.Compose
+    transforms:
+      - _target_: monai.transforms.Orientationd
+        keys: ["image", "label"]
+        axcodes: "RAS"
+        allow_missing_keys: true
+
+      - _target_: monai.transforms.SignalFillEmptyd
+        keys: ["image", "label"]
+        replacement: 0
+        allow_missing_keys: true
+
+      - _target_: monai.transforms.Spacingd
+        keys: ["image", "label"]
+        pixdim: [1, 1, 1]
+        mode: ["bilinear", "nearest"]
+        allow_missing_keys: true
+
+      - _target_: monai.transforms.SpatialPadd
+        keys: ["image", "label"]
+        spatial_size: [256, 256, 256]
+        mode: "constant"
+        allow_missing_keys: true
+
+      - _target_: monai.transforms.CenterSpatialCropd
+        keys: ["image", "label"]
+        roi_size: [256, 256, 256]
+        allow_missing_keys: true
+
+      - _target_: monai.transforms.ScaleIntensityd
+        keys: ["image"]
+        minv: 0
+        maxv: 1
+
+
+save_path: /media/vzalevskyi/data/LISA2025/bids/derivatives/predictions
+
+test_splits:
+  - lisaval
+
+
+device: cuda:0
+# passing checkpoint paths is necessary for evaluation
+ckpt_paths:
+  - /mnt/Home2/projects/segsynthtemplate/None/logs/lisaft_boblisatr_t2w_synth/runs/2025-07-02_18-25-57/checkpoints/epoch_795_val_dsc_0.8041_step_53949.ckpt
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+
+task_name: "eval"
+
+tags: ["dev"]

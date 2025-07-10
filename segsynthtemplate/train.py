@@ -7,6 +7,8 @@ import torch
 from lightning import Callback, LightningDataModule, LightningModule, Trainer
 from lightning.pytorch.loggers import Logger
 from omegaconf import DictConfig
+from typing import Sequence
+from torch.nn import Module
 
 rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 
@@ -42,13 +44,14 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     model: LightningModule = hydra.utils.instantiate(cfg.model)
 
     if cfg.get("ckpt_path"):
-        log.info(f"Loading model weights from <{cfg.ckpt_path}>")
-        state_dict = torch.load(cfg.ckpt_path)["state_dict"]
-        # remove the last layer of the model
-        state_dict = {
-            k: v for k, v in state_dict.items() if "net.model.2.0.conv" not in k
-        }
-        model.load_state_dict(state_dict, strict=False)
+        log.info(f"Loading model weights (partial) from <{cfg.ckpt_path}>")
+        load_checkpoint_weights(
+            model=model,
+            ckpt_path=cfg.ckpt_path,
+            map_location="cuda" if torch.cuda.is_available() else "cpu",
+            # anything you were already removing, e.g. your final conv layer:
+            # ignore_layers=["net.model.2.0.conv"],
+        )
 
     log.info(f"Instantiating datamodule <{cfg.data._target_}>")
     datamodule: LightningDataModule = hydra.utils.instantiate(cfg.data)
@@ -81,14 +84,63 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         log.info("Starting training!")
         trainer.fit(
             model=model,
-            ckpt_path=cfg.get("ckpt_path"),
+            # note: we no longer need to pass `ckpt_path` here,
+            # since weights are already in the model
             train_dataloaders=datamodule.train_dataloader(),
             val_dataloaders=datamodule.val_dataloader(),
         )
-
     train_metrics = trainer.callback_metrics
     print(train_metrics)
     return train_metrics
+
+
+def load_checkpoint_weights(
+    model: Module,
+    ckpt_path: str,
+    ignore_layers: Sequence[str] = (),
+    map_location: str = "",
+) -> None:
+    """
+    Load matching weights from a checkpoint into `model`, skipping any layers
+    whose names contain one of the `ignore_layers` substrings, missing keys,
+    or shape mismatches. Prints a warning for each skipped key.
+    """
+    ckpt = torch.load(ckpt_path, map_location=map_location)
+    state_dict = ckpt.get("state_dict", ckpt)
+    model_dict = model.state_dict()
+
+    loaded_keys = []
+    skipped = []
+
+    for name, param in state_dict.items():
+        if any(ign in name for ign in ignore_layers):
+            skipped.append((name, f"ignored by pattern {ignore_layers}"))
+            continue
+
+        if name not in model_dict:
+            skipped.append((name, "not found in model"))
+            continue
+
+        if param.shape != model_dict[name].shape:
+            skipped.append(
+                (
+                    name,
+                    f"shape mismatch checkpoint {tuple(param.shape)} vs model {tuple(model_dict[name].shape)}",
+                )
+            )
+            continue
+
+        # all good → copy
+        model_dict[name] = param
+        loaded_keys.append(name)
+
+    # load the new state dict into the model
+    model.load_state_dict(model_dict)
+
+    # report
+    print(f"✔ Loaded {len(loaded_keys)} parameters")
+    for name, reason in skipped:
+        print(f"⚠️  Skipped '{name}': {reason}")
 
 
 @hydra.main(version_base="1.3", config_path="../configs", config_name="train.yaml")
