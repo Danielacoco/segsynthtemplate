@@ -1,0 +1,69 @@
+# @package _global_
+
+# to execute this experiment run:
+# python train.py experiment=example
+
+defaults:
+  - override /data: datamodule
+  - override /model: segmentor
+  - override /callbacks: default
+  - override /trainer: gpu
+
+# same as filename without extension
+task_name: dhcp_lisa_t2w_synthPftreal
+
+model:
+  net:
+    out_channels: 9
+  num_classes: 9
+
+
+
+data:
+  train_type: real # "synth", "real"
+  val_type: real # "synth", "real"
+
+  img_suffix: T2w
+  seg_suffix: seg-lisa_dseg
+  apply_mri_augm: true
+
+
+  generator:
+
+    spatial_deform:
+      flip_prb: 0
+
+    intensity_generator:
+      min_subclusters: 3
+      max_subclusters: 9
+
+    resampler:
+      prob: 0.9
+      min_resolution: 3
+      max_resolution: 5.5
+
+    simulate_motion: null
+    boundaries: null
+    struct_noise: null
+    blur_cortex: null
+
+  split_file: /home/vzalevskyi/Desktop/Data/neonatalDHCP/splits/participants.csv
+  bids_path: /home/vzalevskyi/Desktop/Data/neonatalDHCP/resampled05
+  seed_path: /home/vzalevskyi/Desktop/Data/neonatalDHCP/seedsT2w
+
+  train_split: train
+  val_split: val # "synth", "real", "test"
+  # test type always test
+  test_split: test
+
+  num_workers: 1
+  batch_size: 1
+
+trainer:
+  log_every_n_steps: null
+
+logger:
+  wandb:
+    project: lisa
+
+ckpt_path: /home/vzalevskyi/projects/segsynthtemplate/None/logs/dhcp_lisa_t2w_synth/runs/2025-07-09_15-40-07/checkpoints/epoch_118_val_dsc_0.7739_step_97104.ckpt
