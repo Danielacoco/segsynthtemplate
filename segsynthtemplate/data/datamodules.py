@@ -24,6 +24,7 @@ class DataModule(L.LightningDataModule):
         batch_size: int = 1,
         img_suffix: str = "T2w",
         seg_suffix: str = "dseg",
+        apply_mri_augm: bool = False,
         load_segmentations: bool = True,
     ):
         super().__init__()
@@ -34,6 +35,7 @@ class DataModule(L.LightningDataModule):
         self.seed_path = seed_path
         self.train_type = train_type
         self.train_split = train_split
+        self.apply_mri_augm = apply_mri_augm
         self.val_type = val_type
         self.val_split = val_split
         self.test_split = test_split
@@ -60,6 +62,7 @@ class DataModule(L.LightningDataModule):
                 generator=self.generator,
                 img_suffix=self.img_suffix,
                 seg_suffix=self.seg_suffix,
+                apply_mri_augm=self.apply_mri_augm,
             )
         elif self.train_type == "real":
             self.train_ds = FetalSynthDataset(
@@ -71,6 +74,7 @@ class DataModule(L.LightningDataModule):
                 generator=self.generator,
                 img_suffix=self.img_suffix,
                 seg_suffix=self.seg_suffix,
+                apply_mri_augm=self.apply_mri_augm,
             )
 
         if self.val_type == "synth":

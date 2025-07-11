@@ -75,7 +75,7 @@ test_splits:
 device: cuda:0
 # passing checkpoint paths is necessary for evaluation
 ckpt_paths:
-  - /mnt/Home2/projects/segsynthtemplate/None/logs/lisaft_boblisatr_t2w_synth/runs/2025-07-02_18-25-57/checkpoints/epoch_795_val_dsc_0.8041_step_53949.ckpt
+  - /mnt/Home2/projects/segsynthtemplate/None/logs/lisaft_dhcplisatr_t2w_synth/runs/2025-07-10_11-54-19/checkpoints/epoch_134_val_dsc_0.7988_step_10125.ckpt
 
 hydra:
   run:
