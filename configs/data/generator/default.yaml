@@ -15,7 +15,6 @@ intensity_generator:
 spatial_deform:
   _target_: fetalsyngen.generator.deformation.affine_nonrigid.SpatialDeformation
   device: "${..device}" # uses the device from the generator
-  size: ${..shape} # uses the shape from the generator
   prob: 0.9
   
   flip_prb: 0.5
@@ -54,69 +53,3 @@ noise:
   prob: 0.9
   std_min: 5
   std_max: 15
-
-blur_cortex:
-  _target_: fetalsyngen.generator.augmentation.artifacts.BlurCortex
-  prob: 0.4
-  cortex_label: 2
-  nblur_min: 50
-  nblur_max: 200
-  sigma_gamma_loc: 3
-  sigma_gamma_scale: 1
-  std_blur_shape: 2
-  std_blur_scale: 1
-
-struct_noise:
-  _target_: fetalsyngen.generator.augmentation.artifacts.StructNoise
-  prob: 0.4
-  wm_label: 3
-  std_min: 0.2
-  std_max: 0.4
-  nloc_min: 5
-  nloc_max: 15
-
-simulate_motion:
-  _target_: fetalsyngen.generator.augmentation.artifacts.SimulateMotion
-  prob: 0.4
-  scanner_params:
-    _target_: fetalsyngen.generator.artifacts.utils.ScannerParams
-    resolution_slice_fac_min: 0.5
-    resolution_slice_fac_max: 2
-    resolution_slice_max: 1.5
-    slice_thickness_min: 1.5
-    slice_thickness_max: 3.5
-    gap_min: 1.5
-    gap_max: 5.5
-    min_num_stack: 2
-    max_num_stack: 6
-    max_num_slices: 250
-    noise_sigma_min: 0
-    noise_sigma_max: 0.1
-    TR_min: 1
-    TR_max: 2
-    prob_gamma: 0.1
-    gamma_std: 0.05
-    prob_void: 0.2
-    slice_size: null
-    restrict_transform: False
-    txy: 3.0
-
-  recon_params:
-    _target_: fetalsyngen.generator.artifacts.utils.ReconParams
-    prob_misreg_slice: 0.08
-    slices_misreg_ratio: 0.1
-    prob_misreg_stack: 0.08
-    txy: 3.0
-    prob_merge: 0.8
-    merge_ngaussians_min: 2
-    merge_ngaussians_max: 4
-    prob_smooth: 0.2
-    prob_rm_slices: 0.3
-    rm_slices_min: 0.1
-    rm_slices_max: 0.4
-
-boundaries:
-  _target_: fetalsyngen.generator.augmentation.artifacts.SimulatedBoundaries
-  prob_no_mask: 0.5
-  prob_if_mask_halo: 0.5
-  prob_if_mask_fuzzy: 0.5

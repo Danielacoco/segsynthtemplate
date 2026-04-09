@@ -147,6 +147,7 @@ class DataModule(L.LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             multiprocessing_context="spawn",
+            persistent_workers=True,
         )
 
     def val_dataloader(self):
@@ -156,6 +157,7 @@ class DataModule(L.LightningDataModule):
             num_workers=self.num_workers,
             pin_memory=True,
             multiprocessing_context="spawn",
+            persistent_workers=True,
         )
 
     def test_dataloader(self):
