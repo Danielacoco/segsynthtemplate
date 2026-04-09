@@ -27,8 +27,8 @@ data:
   #   struct_noise: null
   #   blur_cortex: null
 
-  split_file: /media/vzalevskyi/data/FETA_challenge/merged_feta_spinabifida/merged_participants_meta_vienna.csv
-  bids_path: /media/vzalevskyi/data/FETA_challenge/merged_feta_spinabifida/derivatives/resampled05
+  split_file: /media/danielaco/HDD2TB/DataDaniela/feta_2.4/splits.csv
+  bids_path: /media/danielaco/HDD2TB/DataDaniela/feta_2.4/
   seed_path: /media/vzalevskyi/data/FETA_challenge/merged_feta_spinabifida/derivatives/seeds
   train_split: feta_train
   val_split: feta_val # "synth", "real", "test"
