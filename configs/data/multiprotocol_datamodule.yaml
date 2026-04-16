@@ -1,0 +1,26 @@
+defaults:
+  - transforms/inference
+
+_target_: segsynthtemplate.data.datamodules.MultiProtocolDataModule
+
+# List of datasets. Multiple entries may share the same protocol_name
+# (e.g. two FeTa cohorts from different sites).
+# Each entry must have: bids_path, split_file, protocol_name.
+datasets: []
+
+label_map_csv: /path/to/label_map.csv
+
+train_type: synth   # "synth" or "real"
+train_split: train
+
+val_type: real      # "synth" or "real"
+val_split: val
+
+# test always uses FetalTestDataset
+test_split: test_i
+
+num_workers: 2
+batch_size: 2
+
+# synth_configs is set per-experiment when train_type or val_type is "synth"
+synth_configs: null

@@ -1,0 +1,28 @@
+# @package _global_
+# Experiment config for validating MultiProtocolDataModule.
+# Run with:
+#   python segsynthtemplate/validatedate_multiprotocol.py experiment=mthesis/validate_multiprotocol
+
+defaults:
+  - override /data: multiprotocol_datamodule
+
+task_name: validate_multiprotocol
+
+data:
+  train_type: real   # switch to "synth" once generators are wired up
+  val_type: real
+  train_split: train
+  val_split: val
+  test_split: test_i
+
+  # List of datasets. Add more entries to mix protocols or cohorts.
+  # Multiple entries may share the same protocol_name (e.g. two FeTa sites).
+  datasets:
+    - bids_path:      /media/danielaco/HDD2TB/DataDaniela/feta_2.4/derivatives/resampled05/resampled05/
+      split_file:     /media/danielaco/HDD2TB/DataDaniela/feta_2.4/splits.csv
+      protocol_name:  FeTa
+
+  label_map_csv: /path/to/label_map.csv   # TODO: fill in real path
+
+  num_workers: 1
+  batch_size: 1

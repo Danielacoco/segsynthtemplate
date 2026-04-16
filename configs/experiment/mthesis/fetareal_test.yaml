@@ -1,0 +1,29 @@
+# @package _global_
+
+defaults:
+  - override /data: datamodule
+  - override /model: segmentor
+  - override /callbacks: default
+  - override /trainer: gpu
+
+task_name: fetareal_test
+
+model:
+  net:
+    out_channels: 8
+  num_classes: 8
+
+data:
+  train_type: real # "synth", "real"
+  val_type: real # "synth", "real"
+
+  split_file: /media/danielaco/HDD2TB/DataDaniela/feta_2.4/splits.csv
+  bids_path: /media/danielaco/HDD2TB/DataDaniela/feta_2.4/derivatives/resampled05/resampled05/
+  seed_path: /media/vzalevskyi/data/FETA_challenge/merged_feta_spinabifida/derivatives/seeds
+
+  train_split: train
+  val_split: val # "synth", "real", "test"
+  test_split: test_i
+
+  num_workers: 1
+  batch_size: 1

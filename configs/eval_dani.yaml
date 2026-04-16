@@ -1,0 +1,88 @@
+defaults:
+  # important configs defining data and model
+  - data: datamodule
+  - model: segmentor
+  # configs defining logging and callbacks
+  - callbacks: default
+  - logger: wandb
+  - trainer: gpu
+  - paths: default
+  - extras: default
+  - hydra: default
+  - _self_
+
+
+model:
+  net:
+    out_channels: 8
+  num_classes: 8
+
+data:
+  split_file: /media/danielaco/HDD2TB/DataDaniela/feta_2.4/splits.csv
+  bids_path: /media/danielaco/HDD2TB/DataDaniela/feta_2.4/
+  seed_path: null
+
+  num_workers: 1
+  batch_size: 1
+  img_suffix: T2w
+  seg_suffix: dseg
+  load_segmentations: true
+
+  transforms:
+    _target_: monai.transforms.Compose
+    transforms:
+      # - _target_: monai.transforms.Orientationd
+      #   keys: ["image", "label"]
+      #   axcodes: "RAS"
+
+      - _target_: monai.transforms.SignalFillEmptyd
+        keys: ["image", "label"]
+        replacement: 0
+        allow_missing_keys: true
+
+      # - _target_: monai.transforms.Spacingd
+      #   keys: ["image", "label"]
+      #   pixdim: [0.5, 0.5, 0.5]
+      #   mode: ["bilinear", "nearest"]
+      #   allow_missing_keys: true
+
+      # - _target_: monai.transforms.SpatialPadd
+      #   keys: ["image", "label"]
+      #   spatial_size: [256, 256, 256]
+      #   mode: "constant"
+      #   allow_missing_keys: true
+
+      # - _target_: monai.transforms.CenterSpatialCropd
+      #   keys: ["image", "label"]
+      #   roi_size: [256, 256, 256]
+      #   allow_missing_keys: true
+
+      - _target_: monai.transforms.ScaleIntensityd
+        keys: ["image"]
+        minv: 0
+        maxv: 1
+
+save_path: /media/danielaco/HDD2TB/DataDaniela/feta_2.4/derivatives_dani/predictions  
+
+test_splits:
+  - test_i
+
+
+metrics:
+  - dice
+  - hd95th
+  - vs
+
+device: cuda:0
+
+ckpt_paths:
+  - /home/danielaco/Documents/segsynthtemplate/None/logs/vladtestcheckpoint/runs/2026-04-10_14-31-28/checkpoints/epoch_275_val_dsc_0.8589_step_23184.ckpt
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+
+task_name: "eval"
+
+tags: ["dev"]

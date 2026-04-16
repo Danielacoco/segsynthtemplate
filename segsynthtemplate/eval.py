@@ -95,6 +95,7 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
                     # pred
                     pred = model.predict(image.unsqueeze(0).to(cfg.device))
                     mean_dice = -1
+                    #dani metrics comp here in 0.5 space *before reverse transform* 
                     if cfg.metrics is not None:
                         pred_1h = onehoteencoder(pred.unsqueeze(0))
                         gt_1h = onehoteencoder(label.unsqueeze(0).to(cfg.device))
@@ -127,6 +128,12 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
                         mean_dice = dice[:].mean()
 
                     pred = monai.data.meta_tensor.MetaTensor(pred).copy_meta_from(label)
+                    #dani debug -start
+                    pred_05mm = pred[0].cpu().numpy().astype("int8")
+                    affine_05mm = label.meta["affine"].numpy()
+                    image_05mm = image[0].cpu().numpy()
+                    image_affine_05mm = image.meta["affine"].numpy()
+                    #dani debug -end
                     pred_data = {"label": pred, "image": image}
                     pred_orgi_space = test_ds.reverse_transform(pred_data)
                     # print pred meta dict
@@ -138,14 +145,52 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
                         / f"{name.split('_')[0]}/{name.split('_')[1]}/anat/"
                     )
                     output_dir.mkdir(exist_ok=True, parents=True)
+                    #dani debug -start
+                    # save at 0.5mm (metric space) for visual verification — image and pred guaranteed aligned
+                    img_05mm = nib.Nifti1Image(pred_05mm, affine=affine_05mm)
+                    img_05mm.set_qform(affine_05mm, code=1)
+                    img_05mm.set_sform(affine_05mm, code=1)
+                    nib.save(img_05mm, output_dir / f"{name}_pred_05mm.nii.gz")
+
+                    t2w_05mm = nib.Nifti1Image(image_05mm, affine=image_affine_05mm)
+                    t2w_05mm.set_qform(image_affine_05mm, code=1)
+                    t2w_05mm.set_sform(image_affine_05mm, code=1)
+                    nib.save(t2w_05mm, output_dir / f"{name}_T2W_05mm.nii.gz")
+                    #dani debug -end
                     nib_image = nib.Nifti1Image(
                         pred_orgi_space["label"][0].cpu().numpy().astype("int8"),
                         affine=pred_orgi_space["image"].meta["affine"],
                     )
+                    #dani debug -start
+                    nib_image.set_qform(pred_orgi_space["label"].meta["affine"].numpy(), code=1)
+                    nib_image.set_sform(pred_orgi_space["label"].meta["affine"].numpy(), code=1)
+                    #dani debug -end
                     nib.save(
                         nib_image,
                         output_dir / f"{name}_dcs-{mean_dice:.3f}_pred.nii.gz",
                     )
+                    #dani debug -start
+                    nib_image = nib.Nifti1Image(
+                        pred_orgi_space["image"][0].cpu().numpy(),
+                        affine=pred_orgi_space["image"].meta["affine"].numpy(),
+                    )
+                    nib_image.set_qform(pred_orgi_space["image"].meta["affine"].numpy(), code=1)
+                    nib_image.set_sform(pred_orgi_space["image"].meta["affine"].numpy(), code=1)
+                    nib.save(
+                        nib_image,
+                        output_dir / f"{name}_T2W.nii.gz",
+                    )
+
+                    # save gt label too
+                    nib_image = nib.Nifti1Image(
+                        label.cpu().numpy().astype("int8")[0],
+                        affine=label.meta["affine"].numpy(),
+                    )
+                    nib.save(
+                        nib_image,
+                        output_dir / f"{name}_GT_dseg.nii.gz",
+                    )
+                    #dani debug -end
                     if cfg.metrics is not None:
                         subj_res = [
                             {
