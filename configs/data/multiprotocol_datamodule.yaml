@@ -1,4 +1,5 @@
 defaults:
+  - generator/default
   - transforms/inference
 
 _target_: segsynthtemplate.data.datamodules.MultiProtocolDataModule
@@ -8,7 +9,7 @@ _target_: segsynthtemplate.data.datamodules.MultiProtocolDataModule
 # Each entry must have: bids_path, split_file, protocol_name.
 datasets: []
 
-label_map_csv: /path/to/label_map.csv
+label_map_csv: /home/danielaco/Documents/segsynthtemplate/label_map_multiprotocol.csv
 
 train_type: synth   # "synth" or "real"
 train_split: train
@@ -22,5 +23,23 @@ test_split: test_i
 num_workers: 2
 batch_size: 2
 
-# synth_configs is set per-experiment when train_type or val_type is "synth"
+# synth_configs is set per-experiment when train_type or val_type is "synth".
+# Overrides the top-level generator for that protocol.
+# seed_path points to a folder of seed volumes used as intensity priors.
+# Example:
+#
+# synth_configs:
+#   feta:
+#     generator:
+#       _target_: fetalsyngen.generator.model.FetalSynthGen
+#       shape: [256, 256, 256]
+#       resolution: [0.5, 0.5, 0.5]
+#       device: cuda:0
+#       # ... (folow same structure as generator/default.yaml)
+#     seed_path: /path/to/feta/seeds
+#     apply_mri_augm: false
+#   drawem9_albert:
+#     seed_path: /path/to/dhcp/seeds
+#     apply_mri_augm: false
+#     # generator not specified, should fall back to top-level generator
 synth_configs: null

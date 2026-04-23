@@ -1,0 +1,42 @@
+_target_: segsynthtemplate.models.conemos_segmentor.CoNeMOSSegmentor
+
+# Number of foreground output channels == max(channel) in label_map_csv.
+# With the current label_map_multiprotocol.csv this is 8.
+num_fg_channels: 8
+
+# Ordered list of protocol names, matching the first-seen order in the
+# datamodule's `datasets` list (= MultiProtocolDataset.protocol_registry).
+protocol_names:
+  - drawem9_albert
+  - feta
+
+label_map_csv: /home/danielaco/Documents/segsynthtemplate/label_map_multiprotocol.csv
+
+net:
+  _target_: segsynthtemplate.models.conemos_unet.CoNeMOSUNet
+  num_protocols: ${len:${model.protocol_names}}   # 2
+  num_fg_channels: ${model.num_fg_channels}
+  n_levels: 4
+  n_features_init: 16
+  feat_mult: 2
+  n_conv_per_level: 2
+  conv_size: 3
+  norm_type: null           # null | "batch" | "instance"
+  n_conditioned_layers: 0   # 0 = all layers conditioned
+  mlp_hidden_dim: 64
+  mlp_n_layers: 4
+
+optimizer:
+  _target_: torch.optim.Adam
+  _partial_: true
+  weight_decay: 0.0
+
+scheduler:
+  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+  _partial_: true
+  mode: min
+  factor: 0.1
+  patience: 500
+
+compile: false
+lr: 0.0001

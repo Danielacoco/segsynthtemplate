@@ -174,15 +174,15 @@ class MultiProtocolDataModule(L.LightningDataModule):
     """DataModule for multi-protocol CoNeMos training.
 
     ``datasets`` is a list of dicts, one per source dataset. Each dict must
-    have ``bids_path``, ``split_file``, and ``protocol_name`` keys. Multiple
-    entries may share the same ``protocol_name`` (e.g. two FeTa cohorts).
+    have {bids_path, split_file, and protocol_name} keys. Multiple
+    entries may share the same protocol_name (like two FeTa cohorts/datasets).
     ``get_subjects()`` reads each split CSV and combines subjects across
     all datasets to produce train / val / test entries.
 
     Synthesis settings (generator, seed_path, apply_mri_augm) are passed
     separately via ``synth_configs``, a dict keyed by protocol name.
     ``train_type`` and ``val_type`` (``"synth"`` or ``"real"``) mirror the
-    original ``DataModule`` — both use ``FetalSynthDataset`` internally.
+    original ``DataModule``:both use ``FetalSynthDataset`` internally.
     Test always uses ``FetalTestDataset`` (no generator).
 
     The split CSV for each dataset must have columns ``participant_id`` and
@@ -198,15 +198,16 @@ class MultiProtocolDataModule(L.LightningDataModule):
         train_split: Value in the ``splits`` column for training subjects.
         val_split: Value in the ``splits`` column for validation subjects.
         test_split: Value in the ``splits`` column for test subjects.
-        transforms: MONAI transforms applied to val and test samples.
+        transforms: MONAI transforms applied to val and test samples. Specified in
+            the config file.
         synth_configs: Optional dict ``{protocol_name: {...}}`` for datasets
             that use synthesis during training. Each inner dict may contain:
             ``train_type`` (``"synth"``, default ``"real"``), ``generator``
-            (required if synth), ``seed_path``, ``apply_mri_augm``.
+            (required if synth), ``seed_path``, ``apply_mri_augm``. (DANI: path not tested yet)
         num_workers: DataLoader workers.
         batch_size: Batch size for all dataloaders.
-        img_suffix: Image file suffix.
-        seg_suffix: Segmentation file suffix.
+        img_suffix: Image file suffix. These can also be specified per-dataset in the top-level dict, which overrides this default.
+        seg_suffix: Segmentation file suffix. THis can also be specified per-dataset in the top-level dict, which overrides this default.
     """
 
     def __init__(
@@ -217,6 +218,7 @@ class MultiProtocolDataModule(L.LightningDataModule):
         val_split: str,
         test_split: str,
         transforms: monai.transforms.Compose,
+        generator: FetalSynthGen | None = None,
         train_type: str = "real",
         val_type: str = "real",
         synth_configs: dict[str, dict] | None = None,
@@ -232,6 +234,7 @@ class MultiProtocolDataModule(L.LightningDataModule):
         self.val_split = val_split
         self.test_split = test_split
         self.transforms = transforms
+        self.generator = generator
         self.train_type = train_type
         self.val_type = val_type
         self.synth_configs = synth_configs or {}
@@ -273,7 +276,7 @@ class MultiProtocolDataModule(L.LightningDataModule):
         """Read each dataset's split CSV and return three lists of entries
         (train, val, test) with ``sub_list`` pre-filled.
 
-        Loops over ``self.datasets`` exactly like the original
+        Loops over ``self.datasets``  like the original
         ``DataModule.get_subjects()``, but across multiple datasets.
         """
         train_entries, val_entries, test_entries = [], [], []
@@ -291,7 +294,8 @@ class MultiProtocolDataModule(L.LightningDataModule):
                 f"split_file '{split_file}' is missing 'splits' column"
             )
 
-            base = {"bids_path": bids_path, "protocol_name": protocol_name}
+            base = {"bids_path": bids_path, "protocol_name": protocol_name,
+                    **{k: ds[k] for k in ("img_suffix", "seg_suffix") if k in ds}}
             synth = self.synth_configs.get(protocol_name, {})
 
             train_entries.append({
@@ -299,17 +303,17 @@ class MultiProtocolDataModule(L.LightningDataModule):
                 "sub_list":   split_df[split_df.splits == self.train_split].participant_id.tolist(),
                 "train_type": self.train_type,
                 "is_test":    False,
-                # forward synth-only keys when present
-                **{k: synth[k] for k in ("generator", "seed_path", "apply_mri_augm") if k in synth},
+                # top-level generator is the default; synth_configs can override per-protocol
+                "generator":  synth.get("generator", self.generator),
+                **{k: synth[k] for k in ("seed_path", "apply_mri_augm") if k in synth},
             })
             val_entries.append({
                 **base,
                 "sub_list":   split_df[split_df.splits == self.val_split].participant_id.tolist(),
                 "train_type": self.val_type,
                 "is_test":    False,
-                # forward synth-only keys for val if val_type="synth"
-                **({k: synth[k] for k in ("generator", "seed_path") if k in synth}
-                   if self.val_type == "synth" else {}),
+                "generator":  synth.get("generator", self.generator),
+                **{k: synth[k] for k in ("seed_path",) if k in synth},
             })
             test_entries.append({
                 **base,

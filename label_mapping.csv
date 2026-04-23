@@ -1,0 +1,19 @@
+label_uid,dataset,label_id,description,channel_label,stage,protocol
+feta_0,feta,0,background,bg,fetal,feta
+feta_1,feta,1,cerebro spinal fluid,csf,fetal,feta
+feta_2,feta,2,gray matter,cgm,fetal,feta
+feta_3,feta,3,white matter,wm,fetal,feta
+feta_4,feta,4,ventricles,v,fetal,feta
+feta_5,feta,5,cerebellum,cbm,fetal,feta
+feta_6,feta,6,deep gray matter,dgm,fetal,feta
+feta_7,feta,7,brainstem and spinal cord,bs,fetal,feta
+fetaldhcp9_0,fetal_dHCP,0,clear label,bg,fetal,drawem9_albert
+fetaldhcp9_1,fetal_dHCP,1,CSF,csf,fetal,drawem9_albert
+fetaldhcp9_2,fetal_dHCP,2,cortical gray matter,cgm,fetal,drawem9_albert
+fetaldhcp9_3,fetal_dHCP,3,white matter,wm,fetal,drawem9_albert
+fetaldhcp9_4,fetal_dHCP,4,background,bg,fetal,drawem9_albert
+fetaldhcp9_5,fetal_dHCP,5,ventricles,v,fetal,drawem9_albert
+fetaldhcp9_6,fetal_dHCP,6,cerebellum,cbm,fetal,drawem9_albert
+fetaldhcp9_7,fetal_dHCP,7,deep gray matter,dgm,fetal,drawem9_albert
+fetaldhcp9_8,fetal_dHCP,8,brainstem and spinal cord,bs,fetal,drawem9_albert
+fetaldhcp9_9,fetal_dHCP,9,hippocampi and amygdala,ha,fetal,drawem9_albert

@@ -56,6 +56,18 @@ def _plot_sample(ax_row_img, ax_row_lbl, sample: dict, title: str, slicenum: int
         ax_row_lbl[col].axis("off")
 
 
+def _one_per_protocol(ds):
+    """Return one sample per protocol using the first and last flat indices."""
+    samples = {}
+    indices = [0, len(ds) - 1]
+    for idx in indices:
+        sample = ds[idx]
+        name = sample["protocol_name"]
+        if name not in samples:
+            samples[name] = sample
+    return samples
+
+
 @task_wrapper
 def evaldata(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     if cfg.get("seed"):
@@ -64,37 +76,52 @@ def evaldata(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     log.info(f"Instantiating datamodule <{cfg.data._target_}>")
     datamodule = hydra.utils.instantiate(cfg.data)
 
-    train_sample = datamodule.train_ds[0]
-    val_sample   = datamodule.val_ds[0]
-    test_sample  = datamodule.test_ds[0]
-
-    _print_sample("train", train_sample)
-    _print_sample("val",   val_sample)
-    _print_sample("test",  test_sample)
-
-    # protocol_vec sanity checks (train and val carry it; test does too)
     num_protocols = len(datamodule.train_ds.protocol_registry)
     print(f"\nprotocol_registry : {datamodule.train_ds.protocol_registry}")
     print(f"num_channels      : {datamodule.train_ds.num_channels}")
-    for split_name, sample in [("train", train_sample), ("val", val_sample), ("test", test_sample)]:
-        assert "protocol_vec" in sample, f"{split_name} sample missing protocol_vec"
-        assert sample["protocol_vec"].shape == (num_protocols,), (
-            f"{split_name} protocol_vec shape mismatch: "
-            f"{sample['protocol_vec'].shape} vs ({num_protocols},)"
-        )
-        assert sample["protocol_vec"].sum() == 1.0, \
-            f"{split_name} protocol_vec is not one-hot"
+
+    train_samples = _one_per_protocol(datamodule.train_ds)
+    val_samples   = _one_per_protocol(datamodule.val_ds)
+    test_samples  = _one_per_protocol(datamodule.test_ds)
+
+    for protocol in datamodule.train_ds.protocol_registry:
+        print(f"\n=== protocol: {protocol} ===")
+        if protocol in train_samples:
+            _print_sample("train", train_samples[protocol])
+        if protocol in val_samples:
+            _print_sample("val",   val_samples[protocol])
+        if protocol in test_samples:
+            _print_sample("test",  test_samples[protocol])
+
+    # protocol_vec sanity checks across all splits and protocols
+    for split_name, samples in [("train", train_samples), ("val", val_samples), ("test", test_samples)]:
+        for protocol, sample in samples.items():
+            assert "protocol_vec" in sample, f"{split_name}/{protocol} sample missing protocol_vec"
+            assert sample["protocol_vec"].shape == (num_protocols,), (
+                f"{split_name}/{protocol} protocol_vec shape mismatch: "
+                f"{sample['protocol_vec'].shape} vs ({num_protocols},)"
+            )
+            assert sample["protocol_vec"].sum() == 1.0, \
+                f"{split_name}/{protocol} protocol_vec is not one-hot"
     print("\nprotocol_vec checks passed.")
 
-    # visualise one sample per split in 3 orientations
-    slicenum = train_sample["image"].shape[-1] // 2
-    fig, axes = plt.subplots(6, 3, figsize=(12, 18))
-    _plot_sample(axes[0], axes[1], train_sample, "Train",      slicenum)
-    _plot_sample(axes[2], axes[3], val_sample,   "Validation", slicenum)
-    _plot_sample(axes[4], axes[5], test_sample,  "Test",       slicenum)
-    plt.tight_layout()
-    plt.savefig("data_sample_multiprotocol.png")
-    log.info("Saved visualisation to data_sample_multiprotocol.png")
+    # visualise one sample per protocol per split
+    protocols = list(datamodule.train_ds.protocol_registry.keys())
+    n_rows = len(protocols) * 2  # image + label row per protocol
+    n_cols = 3                   # axial, coronal, sagittal
+    for split_name, samples in [("train", train_samples), ("val", val_samples), ("test", test_samples)]:
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=(12, 6 * len(protocols)))
+        for p_idx, protocol in enumerate(protocols):
+            if protocol not in samples:
+                continue
+            sample = samples[protocol]
+            slicenum = sample["image"].shape[-1] // 2
+            _plot_sample(axes[p_idx * 2], axes[p_idx * 2 + 1],
+                         sample, f"{split_name} — {protocol}", slicenum)
+        plt.tight_layout()
+        fname = f"data_sample_multiprotocol_{split_name}.png"
+        plt.savefig(fname)
+        log.info(f"Saved visualisation to {fname}")
 
     return {}, {}
 
