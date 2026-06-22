@@ -1,0 +1,16 @@
+# @package _global_
+# Joint multi-protocol CoNeMOS — FiLM conditioned, balanced dataset sampling.
+# Identical to train_conemos_real except balanced_sampling=true, so each
+# dataset contributes equally per epoch regardless of size.
+#
+# Run with:
+#   python segsynthtemplate/train.py experiment=mthesis/train_conemos_balanced
+
+defaults:
+  - train_conemos_real
+  - _self_
+
+task_name: conemos_joint_balanced
+
+data:
+  balanced_sampling: true

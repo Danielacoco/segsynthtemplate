@@ -10,16 +10,19 @@ transforms:
     replacement: 0
     allow_missing_keys: true
 
-  - _target_: monai.transforms.CropForegroundd
-    keys: ["image", "label"]
-    source_key: "image"
-    allow_smaller: true
-    margin: 0
-    allow_missing_keys: true
+  # CropForegroundd disabled: data is already 256^3 at 0.75mm (resampled75),
+  # and the crop shifts the affine origin for tilted images (e.g. FeTa), causing
+  # saved predictions to appear misaligned with the original image in viewers.
+  # - _target_: monai.transforms.CropForegroundd
+  #   keys: ["image", "label"]
+  #   source_key: "image"
+  #   allow_smaller: true
+  #   margin: 0
+  #   allow_missing_keys: true
 
   - _target_: monai.transforms.Spacingd
     keys: ["image", "label"]
-    pixdim: [0.5, 0.5, 0.5]
+    pixdim: [0.75, 0.75, 0.75]
     mode: ["bilinear", "nearest"]
     allow_missing_keys: true
 

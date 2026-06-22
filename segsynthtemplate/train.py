@@ -81,13 +81,15 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         log_hyperparameters(object_dict)
 
     if cfg.get("train"):
+        resume_from = cfg.get("resume_from")
+        if resume_from:
+            log.info(f"Resuming full training state from <{resume_from}>")
         log.info("Starting training!")
         trainer.fit(
             model=model,
-            # note: we no longer need to pass `ckpt_path` here,
-            # since weights are already in the model
             train_dataloaders=datamodule.train_dataloader(),
             val_dataloaders=datamodule.val_dataloader(),
+            ckpt_path=resume_from,
         )
     train_metrics = trainer.callback_metrics
     print(train_metrics)

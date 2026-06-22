@@ -1,5 +1,5 @@
 import lightning as L
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, WeightedRandomSampler
 from fetalsyngen.data.datasets import FetalTestDataset, FetalSynthDataset, FetalSynthGen, MultiProtocolDataset
 import pandas as pd
 import monai
@@ -226,6 +226,7 @@ class MultiProtocolDataModule(L.LightningDataModule):
         batch_size: int = 1,
         img_suffix: str = "T2w",
         seg_suffix: str = "dseg",
+        balanced_sampling: bool = False,
     ):
         super().__init__()
         self.datasets = datasets
@@ -244,14 +245,30 @@ class MultiProtocolDataModule(L.LightningDataModule):
         self.batch_size = batch_size
         self.img_suffix = img_suffix
         self.seg_suffix = seg_suffix
+        self.balanced_sampling = balanced_sampling
 
         train_entries, val_entries, test_entries = self.get_subjects()
+
+        # Crop/pad all training volumes to 256³ so variable-size datasets (e.g.
+        # BOBS at 384×448×384) don't OOM the UNet. Orientation and intensity are
+        # already handled by FetalSynthDataset; only spatial shape matters here.
+        _train_crop = monai.transforms.Compose([
+            monai.transforms.SpatialPadd(
+                keys=["image", "label"], spatial_size=[256, 256, 256],
+                mode="constant", allow_missing_keys=True,
+            ),
+            monai.transforms.CenterSpatialCropd(
+                keys=["image", "label"], roi_size=[256, 256, 256],
+                allow_missing_keys=True,
+            ),
+        ])
 
         self.train_ds = MultiProtocolDataset(
             dataset_entries=train_entries,
             label_map_csv=self.label_map_csv,
             img_suffix=self.img_suffix,
             seg_suffix=self.seg_suffix,
+            transforms=_train_crop,
         )
         self.val_ds = MultiProtocolDataset(
             dataset_entries=val_entries,
@@ -324,9 +341,24 @@ class MultiProtocolDataModule(L.LightningDataModule):
         return train_entries, val_entries, test_entries
 
     def train_dataloader(self):
+        if self.balanced_sampling:
+            ds_sizes: dict[int, int] = {}
+            for ds_idx, _ in self.train_ds.sample_index:
+                ds_sizes[ds_idx] = ds_sizes.get(ds_idx, 0) + 1
+            weights = [1.0 / ds_sizes[ds_idx] for ds_idx, _ in self.train_ds.sample_index]
+            sampler = WeightedRandomSampler(weights, len(weights), replacement=True)
+            return DataLoader(
+                self.train_ds,
+                batch_size=self.batch_size,
+                sampler=sampler,
+                num_workers=self.num_workers,
+                multiprocessing_context="spawn",
+                persistent_workers=True,
+            )
         return DataLoader(
             self.train_ds,
             batch_size=self.batch_size,
+            shuffle=True,
             num_workers=self.num_workers,
             multiprocessing_context="spawn",
             persistent_workers=True,

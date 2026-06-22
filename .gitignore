@@ -173,3 +173,11 @@ cython_debug/
 .vscode
 
 None/
+
+# Project-specific
+*.ckpt
+*.nii.gz
+logs/
+eval_results/
+.~lock*
+.claude/

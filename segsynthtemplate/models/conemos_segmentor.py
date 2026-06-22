@@ -129,9 +129,14 @@ class CoNeMOSSegmentor(LightningModule):
         )
 
         self.train_loss    = MeanMetric()
+        self.train_dice    = MeanMetric()
         self.val_loss      = MeanMetric()
         self.val_dice      = MeanMetric()
         self.val_dice_best = MaxMetric()
+        # per-protocol dice tracked separately so WandB shows per-dataset curves
+        self.val_dice_per_protocol = torch.nn.ModuleDict({
+            name: MeanMetric() for name in protocol_names
+        })
 
     # ------------------------------------------------------------------
     # Init helper
@@ -187,6 +192,8 @@ class CoNeMOSSegmentor(LightningModule):
         self.val_loss.reset()
         self.val_dice.reset()
         self.val_dice_best.reset()
+        for m in self.val_dice_per_protocol.values():
+            m.reset()
 
     def setup(self, stage: str) -> None:
         if self.hparams.compile and stage == "fit":
@@ -210,8 +217,10 @@ class CoNeMOSSegmentor(LightningModule):
         loss   = _masked_ce_loss(logits, labels, ann_mask)
 
         self.train_loss(loss)
+        self.train_dice(_dice_from_logits(logits.detach(), labels, ann_mask))
         self.log("train/loss", self.train_loss, on_step=True, on_epoch=True,
                  prog_bar=True)
+        self.log("train/dice", self.train_dice, on_step=False, on_epoch=True)
         return loss
 
     # ------------------------------------------------------------------
@@ -236,14 +245,51 @@ class CoNeMOSSegmentor(LightningModule):
         self.val_loss(_masked_ce_loss(logits, labels, ann_mask))
         self.val_dice(_dice_from_logits(logits, labels, ann_mask))
 
+        pnames = batch["protocol_name"]
+        if isinstance(pnames, str):
+            pnames = [pnames]
+        for b, pname in enumerate(pnames):
+            dice_b = _dice_from_logits(logits[b:b+1], labels[b:b+1], ann_mask[b:b+1])
+            self.val_dice_per_protocol[pname](dice_b)
+
     def on_validation_epoch_end(self) -> None:
         dice = self.val_dice.compute()
         self.val_dice_best(dice)
         self.log("val/loss",      self.val_loss.compute(),     prog_bar=True, sync_dist=True)
         self.log("val/dice",      dice,                         prog_bar=True, sync_dist=True)
         self.log("val/dice_best", self.val_dice_best.compute(), prog_bar=True, sync_dist=True)
+        for pname, metric in self.val_dice_per_protocol.items():
+            self.log(f"val/dice_{pname}", metric.compute(), prog_bar=False, sync_dist=True)
+            metric.reset()
         self.val_loss.reset()
         self.val_dice.reset()
+
+    # ------------------------------------------------------------------
+    # Test
+    # ------------------------------------------------------------------
+
+    def test_step(
+        self, batch: Dict[str, Any], batch_idx: int, dataloader_idx: int = 0
+    ) -> None:
+        images       = batch["image"]
+        labels       = batch["label"]
+        protocol_vec = batch["protocol_vec"]
+
+        proto_idx = protocol_vec.argmax(dim=1)
+        ann_mask  = self.annotation_mask[proto_idx]
+        logits    = self.net(images, protocol_vec)
+
+        self.log("test/loss", _masked_ce_loss(logits, labels, ann_mask),
+                 on_step=False, on_epoch=True)
+        self.log("test/dice", _dice_from_logits(logits, labels, ann_mask),
+                 on_step=False, on_epoch=True)
+
+        pnames = batch["protocol_name"]
+        if isinstance(pnames, str):
+            pnames = [pnames]
+        for b, pname in enumerate(pnames):
+            dice_b = _dice_from_logits(logits[b:b+1], labels[b:b+1], ann_mask[b:b+1])
+            self.log(f"test/dice_{pname}", dice_b, on_step=False, on_epoch=True)
 
     # ------------------------------------------------------------------
     # Optimizers
@@ -262,6 +308,7 @@ class CoNeMOSSegmentor(LightningModule):
                     "monitor":   "val/loss",
                     "interval":  "epoch",
                     "frequency": 1,
+                    "strict":    False,
                 },
             }
         return {"optimizer": optimizer}

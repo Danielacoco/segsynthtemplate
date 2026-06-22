@@ -1,0 +1,56 @@
+# @package _global_
+# FeTa-only specialist — protocol-agnostic MONAI UNet, real training.
+# Uses MultiProtocolDataModule (feta only) for consistency with dHCP specialist.
+# Segmentor receives 8-class labels (bg=0, fg=1..7).
+#
+# Run with:
+#   python segsynthtemplate/train.py experiment=mthesis/feta_specialist_real
+
+defaults:
+  - override /data: multiprotocol_datamodule
+  - override /model: segmentor
+  - override /callbacks: default
+  - override /trainer: default
+
+task_name: feta_specialist_real
+
+# ── Model: 8 output classes (bg + 7 feta fg structures) ─────────────────────
+model:
+  net:
+    out_channels: 8
+  num_classes: 8
+
+# ── Data ─────────────────────────────────────────────────────────────────────
+data:
+  train_type: real
+  val_type: real
+  transforms: null
+
+  generator:
+    simulate_motion: null
+    boundaries: null
+    struct_noise: null
+    blur_cortex: null
+
+  train_split: train
+  val_split: val
+  test_split: test_i
+
+  datasets:
+    - bids_path:      /media/danielaco/HDD2TB/DataDaniela/feta_2.4/derivatives/resampled05/resampled05/
+      split_file:     /media/danielaco/HDD2TB/DataDaniela/feta_2.4/splits.csv
+      protocol_name:  feta
+
+  label_map_csv: /home/danielaco/Documents/segsynthtemplate/label_map_multiprotocol.csv
+  num_workers: 1
+  batch_size: 1
+
+# ── Trainer ──────────────────────────────────────────────────────────────────
+trainer:
+  accelerator: gpu
+  devices: 1
+  max_epochs: 1000
+  precision: 16-mixed
+  check_val_every_n_epoch: 1
+
+seed: 42

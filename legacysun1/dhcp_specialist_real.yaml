@@ -1,0 +1,59 @@
+# @package _global_
+# dHCP-only specialist — protocol-agnostic MONAI UNet, real training.
+# Uses MultiProtocolDataModule (dHCP only) so that label remapping is applied
+# correctly (raw drawem label 4 → background channel 0).
+# Segmentor receives 9-class labels (bg=0, fg=1..8) from the remapped dHCP data.
+#
+# Run with:
+#   python segsynthtemplate/train.py experiment=mthesis/dhcp_specialist_real
+
+defaults:
+  - override /data: multiprotocol_datamodule
+  - override /model: segmentor
+  - override /callbacks: default
+  - override /trainer: default
+
+task_name: dhcp_specialist_real
+
+# ── Model: 9 output classes (bg + 8 dHCP fg structures) ─────────────────────
+model:
+  net:
+    out_channels: 9
+  num_classes: 9
+
+# ── Data ─────────────────────────────────────────────────────────────────────
+data:
+  train_type: real
+  val_type: real
+  # transforms: null
+
+  generator:
+    simulate_motion: null
+    boundaries: null
+    struct_noise: null
+    blur_cortex: null
+
+  train_split: train
+  val_split: val
+  test_split: test_i
+
+  datasets:
+    - bids_path:      /media/danielaco/HDD2TB/DataDaniela/fetalDHCP/resampled05/
+      split_file:     /media/danielaco/HDD2TB/DataDaniela/fetalDHCP/resampled05/splits.csv
+      protocol_name:  drawem9_albert
+      img_suffix:     T2w
+      seg_suffix:     desc-drawem9_dseg
+
+  label_map_csv: /home/danielaco/Documents/segsynthtemplate/label_map_multiprotocol.csv
+  num_workers: 2
+  batch_size: 1
+
+# ── Trainer ──────────────────────────────────────────────────────────────────
+trainer:
+  accelerator: gpu
+  devices: 1
+  max_epochs: 1000
+  precision: 16-mixed
+  check_val_every_n_epoch: 1
+
+seed: 42

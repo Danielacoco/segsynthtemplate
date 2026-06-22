@@ -1,0 +1,63 @@
+# @package _global_
+# FeTa-only specialist — CoNeMOS backbone, no FiLM conditioning.
+# Architecturally identical to joint_nocond_real but trained on FeTa only.
+# Controlled baseline: isolates the cost of joint training from conditioning.
+#
+# Run with:
+#   python segsynthtemplate/train.py experiment=mthesis/feta_specialist_conemos
+
+defaults:
+  - override /data: multiprotocol_datamodule
+  - override /model: plain_unet_segmentor
+  - override /callbacks: default
+  - override /trainer: default
+
+task_name: feta_specialist_conemos
+
+callbacks:
+  model_checkpoint:
+    filename: "epoch_{epoch:03d}_val_dice_{val/dice:.4f}_step_{step}"
+    monitor: "val/dice"
+    mode: "max"
+  early_stopping:
+    monitor: "val/dice"
+    patience: 500
+    mode: "max"
+
+trainer:
+  accelerator: gpu
+  devices: 1
+  max_epochs: 1000
+  precision: 16-mixed
+  check_val_every_n_epoch: 5
+
+data:
+  train_type: real
+  val_type: real
+  # transforms: null
+
+  generator:
+    simulate_motion: null
+    boundaries: null
+    struct_noise: null
+    blur_cortex: null
+
+  train_split: train
+  val_split: val
+  test_split: test_i
+
+  datasets:
+    - bids_path:      /media/danielaco/HDD2TB/DataDaniela/feta_2.4/derivatives/resampled05/resampled05/
+      split_file:     /media/danielaco/HDD2TB/DataDaniela/feta_2.4/splits_40_10_15_35.csv
+      protocol_name:  feta
+    - bids_path:      /media/danielaco/HDD2TB/DataDaniela/fetalDHCP/resampled05/
+      split_file:     /media/danielaco/HDD2TB/DataDaniela/fetalDHCP/resampled05/splits_40_10_15_35.csv
+      protocol_name:  drawem9_albert
+      img_suffix:     T2w
+      seg_suffix:     desc-drawem9_dseg
+
+  label_map_csv: /home/danielaco/Documents/segsynthtemplate/label_map_multiprotocol.csv
+  num_workers: 1
+  batch_size: 1
+
+seed: 42

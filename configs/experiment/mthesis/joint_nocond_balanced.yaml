@@ -1,0 +1,15 @@
+# @package _global_
+# Joint multi-protocol, no FiLM conditioning, balanced dataset sampling.
+# Ablation: isolates the effect of balanced sampling without conditioning.
+#
+# Run with:
+#   python segsynthtemplate/train.py experiment=mthesis/joint_nocond_balanced
+
+defaults:
+  - joint_nocond_real
+  - _self_
+
+task_name: nocond_joint_balanced
+
+data:
+  balanced_sampling: true

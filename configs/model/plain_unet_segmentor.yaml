@@ -1,13 +1,10 @@
 _target_: segsynthtemplate.models.conemos_segmentor.CoNeMOSSegmentor
 
-# Number of foreground output channels == max(channel) in label_map_csv.
-# With the current label_map_multiprotocol.csv this is 8.
+# Same backbone as CoNeMOS but with FiLM and MLP disabled.
+# protocol_vec from the batch is still used to look up the annotation mask
+# for masked CE — the network itself receives no conditioning signal.
 num_fg_channels: 8
 
-# Ordered list of protocol names, matching the first-seen order in the
-# datamodule's `datasets` list (= MultiProtocolDataset.protocol_registry).
-# Order MUST match the `datasets` list in the experiment config (first-seen = index 0).
-# Experiment configs/experiment/mthesis/train_conemos_real.yaml has feta first.
 protocol_names:
   - feta
   - drawem9_albert
@@ -24,10 +21,11 @@ net:
   feat_mult: 2
   n_conv_per_level: 2
   conv_size: 3
-  norm_type: null           # null | "batch" | "instance"
-  n_conditioned_layers: 0   # 0 = all layers conditioned
+  norm_type: null
+  n_conditioned_layers: 0
   mlp_hidden_dim: 64
   mlp_n_layers: 4
+  conditioned: false
 
 optimizer:
   _target_: torch.optim.Adam

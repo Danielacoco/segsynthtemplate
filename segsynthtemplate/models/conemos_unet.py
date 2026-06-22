@@ -146,20 +146,27 @@ class CoNeMOSUNet(nn.Module):
         n_conditioned_layers: int = 0,
         mlp_hidden_dim: int = 64,
         mlp_n_layers: int = 4,
+        conditioned: bool = True,
     ) -> None:
         super().__init__()
 
+        self.conditioned = conditioned
         cond_dim = mlp_hidden_dim
-        # MLP maps protocol one-hot -> shared latent z
-        self.cond_mlp = CondMLP(num_protocols, mlp_hidden_dim, mlp_n_layers)
 
-        # Layer-index accounting (same logic as original CoNeMOS)
+        if conditioned:
+            self.cond_mlp = CondMLP(num_protocols, mlp_hidden_dim, mlp_n_layers)
+
+        # When conditioned=False, push idx_start beyond all layers so every
+        # use_film list is all-False (FiLM layers become parameter-free Identity).
         n_enc_conv   = n_levels * n_conv_per_level
         n_dec_conv   = (n_levels - 1) * n_conv_per_level
         n_conv_total = n_enc_conv + n_dec_conv + 1   # +1 for final 1x1
-        if n_conditioned_layers == 0:
-            n_conditioned_layers = n_conv_total
-        idx_start = n_conv_total - n_conditioned_layers  # first conditioned layer
+        if not conditioned:
+            idx_start = n_conv_total
+        else:
+            if n_conditioned_layers == 0:
+                n_conditioned_layers = n_conv_total
+            idx_start = n_conv_total - n_conditioned_layers
 
         feats = [int(n_features_init * (feat_mult ** i)) for i in range(n_levels)]
 
@@ -208,7 +215,7 @@ class CoNeMOSUNet(nn.Module):
             FiLM(n_out, cond_dim) if final_conditioned else None
         )
 
-    def forward(self, x: torch.Tensor, condition: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, condition: Optional[torch.Tensor] = None) -> torch.Tensor:
         """
         Args:
             x:         Image tensor       (B, 1, H, W, D).
@@ -219,7 +226,7 @@ class CoNeMOSUNet(nn.Module):
             No activation applied — use F.cross_entropy for the loss (which
             applies softmax internally) and torch.softmax for prediction.
         """
-        z = self.cond_mlp(condition)   # (B, cond_dim)
+        z = self.cond_mlp(condition) if self.conditioned else None  # (B, cond_dim) or None
 
         # Encoder
         skips: list[torch.Tensor] = []

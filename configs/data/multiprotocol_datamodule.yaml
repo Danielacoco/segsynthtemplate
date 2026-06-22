@@ -22,6 +22,7 @@ test_split: test_i
 
 num_workers: 2
 batch_size: 2
+balanced_sampling: false
 
 # synth_configs is set per-experiment when train_type or val_type is "synth".
 # Overrides the top-level generator for that protocol.

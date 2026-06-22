@@ -1,0 +1,71 @@
+# @package _global_
+# FeTa + CHUV fetal specialist — plain UNet, no FiLM conditioning.
+# Both cohorts share the feta protocol label space.
+# In-domain baseline for the combined fetal FeTa cohort.
+#
+# Run with:
+#   python segsynthtemplate/train.py experiment=mthesis/feta_chuv_specialist_real
+
+defaults:
+  - override /data: multiprotocol_datamodule
+  - override /model: plain_unet_segmentor
+  - override /callbacks: default
+  - override /trainer: default
+
+task_name: feta_chuv_specialist
+
+callbacks:
+  model_checkpoint:
+    filename: "epoch_{epoch:03d}_val_dice_{val/dice:.4f}_step_{step}"
+    monitor: "val/dice"
+    mode: "max"
+
+trainer:
+  accelerator: gpu
+  devices: 1
+  max_epochs: 1000
+  precision: 16-mixed
+  check_val_every_n_epoch: 5
+
+model:
+  protocol_names:
+    - feta
+  net:
+    num_protocols: 1
+    conditioned: false
+
+data:
+  train_type: real
+  val_type: real
+
+  generator:
+    device: cuda:0
+    simulate_motion: null
+    boundaries: null
+    struct_noise: null
+    blur_cortex: null
+
+  train_split: train
+  val_split: val
+  test_split: test_i
+
+  datasets:
+    - bids_path:      /media/danielaco/HDD2TB/DataDaniela/feta_2.4/resampled75/
+      split_file:     /media/danielaco/HDD2TB/DataDaniela/feta_2.4/splits_40_10_15_35.csv
+      protocol_name:  feta
+
+    - bids_path:      /media/danielaco/HDD2TB/DataDaniela/CHUV_fetal/resampled75/
+      split_file:     /media/danielaco/HDD2TB/DataDaniela/CHUV_fetal/splits_40_10_15_35.csv
+      protocol_name:  feta
+      img_suffix:     rec-mial_T2w
+      seg_suffix:     rec-mial_dseg
+
+  label_map_csv: /home/danielaco/Documents/segsynthtemplate/label_map_multiprotocol.csv
+  num_workers: 1
+  batch_size: 2
+
+logger:
+  wandb:
+    project: mthesis
+
+seed: 42

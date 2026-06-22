@@ -1,0 +1,83 @@
+# @package _global_
+# Joint multi-protocol training — CoNeMOS backbone, NO FiLM conditioning.
+# Ablation baseline: same architecture and loss as CoNeMOS, but the network
+# receives no protocol signal. Isolates the effect of FiLM conditioning.
+#
+# Run with:
+#   python segsynthtemplate/train.py experiment=mthesis/joint_nocond_real
+
+defaults:
+  - override /data: multiprotocol_datamodule
+  - override /model: plain_unet_segmentor
+  - override /callbacks: default
+  - override /trainer: default
+
+task_name: nocond_joint_uniform
+
+callbacks:
+  model_checkpoint:
+    filename: "epoch_{epoch:03d}_val_dice_{val/dice:.4f}_step_{step}"
+    monitor: "val/dice"
+    mode: "max"
+
+trainer:
+  accelerator: gpu
+  devices: 1
+  max_epochs: 1000
+  precision: 16-mixed
+  check_val_every_n_epoch: 5
+
+data:
+  train_type: real
+  val_type: real
+  # transforms: null
+
+  generator:
+    device: cuda:0
+    simulate_motion: null
+    boundaries: null
+    struct_noise: null
+    blur_cortex: null
+
+  train_split: train
+  val_split: val
+  test_split: test_i
+
+  datasets:
+    - bids_path:      /media/danielaco/HDD2TB/DataDaniela/feta_2.4/resampled75/
+      split_file:     /media/danielaco/HDD2TB/DataDaniela/feta_2.4/splits_40_10_15_35.csv
+      protocol_name:  feta
+
+    - bids_path:      /media/danielaco/HDD2TB/DataDaniela/CHUV_fetal/resampled75/
+      split_file:     /media/danielaco/HDD2TB/DataDaniela/CHUV_fetal/splits_40_10_15_35.csv
+      protocol_name:  feta
+      img_suffix:     rec-mial_T2w
+      seg_suffix:     rec-mial_dseg
+
+    - bids_path:      /media/danielaco/HDD2TB/DataDaniela/fetalDHCP/resampled75/
+      split_file:     /media/danielaco/HDD2TB/DataDaniela/fetalDHCP/resampled75/splits_40_10_15_35.csv
+      protocol_name:  drawem9_albert
+      img_suffix:     T2w
+      seg_suffix:     desc-drawem9_dseg
+
+    - bids_path:      /media/danielaco/HDD2TB/DataDaniela/neonates_dHCP/resampled75/
+      split_file:     /media/danielaco/HDD2TB/DataDaniela/neonates_dHCP/resampled75/splits_40_10_15_35.csv
+      protocol_name:  drawem9_albert
+      img_suffix:     T2w
+      seg_suffix:     desc-drawem9_dseg
+
+    - bids_path:      /media/danielaco/HDD2TB/DataDaniela/neonatal_bobsV1.0/resampled75/
+      split_file:     /media/danielaco/HDD2TB/DataDaniela/neonatal_bobsV1.0/resampled75/splits_40_10_15_35.csv
+      protocol_name:  bobs9
+      img_suffix:     space-INFANTMNIacpc_T2w
+      seg_suffix:     space-INFANTMNIacpc_desc-bobs9_dseg
+
+  label_map_csv: /home/danielaco/Documents/segsynthtemplate/label_map_multiprotocol.csv
+  num_workers: 1
+  batch_size: 2
+
+logger:
+  wandb:
+    project: mthesis
+
+seed: 42
