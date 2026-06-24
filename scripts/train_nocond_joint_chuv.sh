@@ -41,4 +41,7 @@ python /cluster/home/da3999/projects/segsynthtemplate/segsynthtemplate/train.py 
     model.label_map_csv=/cluster/home/da3999/projects/segsynthtemplate/label_map_multiprotocol.csv \
     data.generator.device=cuda:0 \
     logger.wandb.project=mthesis \
-    logger.wandb.name=nocond_joint_uniform
+    logger.wandb.name=nocond_joint_uniform \
+    +resume_from=/cluster/home/da3999/None/logs/nocond_joint_uniform/runs/2026-06-21_11-43-42/checkpoints/last.ckpt \
+    +logger.wandb.id=x7ii7lwp \
+    +logger.wandb.resume=must

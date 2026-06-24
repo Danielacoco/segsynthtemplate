@@ -64,7 +64,11 @@ def _dice_from_logits(
     Returns:
         Scalar mean Dice over annotated (sample, channel) pairs.
     """
-    preds = logits.argmax(dim=1, keepdim=True)   # (B, 1, H, W, D)
+    # Mask unannotated channels to -inf before argmax so they cannot win.
+    masked = logits.clone()
+    unannotated = ~ann_mask                        # (B, num_fg)
+    masked[:, 1:][unannotated] = float("-inf")
+    preds = masked.argmax(dim=1, keepdim=True)    # (B, 1, H, W, D)
     B, num_fg = ann_mask.shape
     dice_sum   = torch.tensor(0.0, device=logits.device)
     count      = torch.tensor(0,   device=logits.device)

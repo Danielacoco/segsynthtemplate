@@ -41,13 +41,19 @@ from segsynthtemplate.models.conemos_segmentor import CoNeMOSSegmentor
 # ---------------------------------------------------------------------------
 
 def _dice_per_channel(
-    logits: torch.Tensor,   # (1, num_fg+1, H, W, D)
-    labels: torch.Tensor,   # (1, 1,        H, W, D)  integer channel indices
+    logits: torch.Tensor,         # (1, num_fg+1, H, W, D)
+    labels: torch.Tensor,         # (1, 1,        H, W, D)  integer channel indices
     num_fg: int,
+    ann: torch.Tensor | None = None,  # (num_fg,) bool — unannotated channels set to -inf
     eps: float = 1e-5,
 ) -> dict[int, float]:
     """Hard Dice per foreground channel (NaN when structure absent in GT)."""
-    pred = logits.argmax(dim=1, keepdim=True)
+    if ann is not None:
+        masked = logits.clone()
+        masked[:, 1:][:, ~ann] = float("-inf")
+        pred = masked.argmax(dim=1, keepdim=True)
+    else:
+        pred = logits.argmax(dim=1, keepdim=True)
     out: dict[int, float] = {}
     for c in range(1, num_fg + 1):
         pred_c = (pred == c).float().view(-1)
@@ -364,7 +370,7 @@ def main(cfg: DictConfig) -> None:
                                       f"{proto_names_list}; using all-channel mask for this protocol.")
                                 unknown_protos.add(pname)
 
-                        ch_dice = _dice_per_channel(logits[b:b+1], labels[b:b+1], num_fg)
+                        ch_dice = _dice_per_channel(logits[b:b+1], labels[b:b+1], num_fg, ann)
                         ch_hd95 = _hd95_per_channel(logits[b:b+1], labels[b:b+1], num_fg)
 
                         row: dict = {"subject": subject, "protocol": pname, "conditioning": cond_names[b]}

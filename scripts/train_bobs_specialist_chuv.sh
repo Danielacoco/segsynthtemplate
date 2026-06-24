@@ -11,7 +11,7 @@
 #SBATCH --gres-flags=enforce-binding
 #SBATCH --mem=64G
 #SBATCH --cpus-per-task=8
-#SBATCH --time=1-00:00:00
+#SBATCH --time=2-00:00:00
 #SBATCH --output=slurm_logs/S4_bobs_specialist_%j.out
 #SBATCH --error=slurm_logs/S4_bobs_specialist_%j.err
 
@@ -34,6 +34,6 @@ python /cluster/home/da3999/projects/segsynthtemplate/segsynthtemplate/train.py 
     data.generator.device=cuda:0 \
     logger.wandb.project=mthesis \
     logger.wandb.name=bobs_specialist \
-    +resume_from=/cluster/home/da3999/None/logs/bobs_specialist/runs/2026-06-21_11-43-02/checkpoints/last.ckpt \
+    +resume_from=/cluster/home/da3999/None/logs/bobs_specialist/runs/2026-06-22_13-39-47/checkpoints/epoch_874_val_dice_0.4831_step_13125.ckpt \
     +logger.wandb.id=xkl1akq4 \
     +logger.wandb.resume=must

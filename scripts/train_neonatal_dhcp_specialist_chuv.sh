@@ -33,4 +33,7 @@ python /cluster/home/da3999/projects/segsynthtemplate/segsynthtemplate/train.py 
     model.label_map_csv=/cluster/home/da3999/projects/segsynthtemplate/label_map_multiprotocol.csv \
     data.generator.device=cuda:0 \
     logger.wandb.project=mthesis \
-    logger.wandb.name=neonatal_dhcp_specialist
+    logger.wandb.name=neonatal_dhcp_specialist \
+    +resume_from=/cluster/home/da3999/None/logs/neonatal_dhcp_specialist/runs/2026-06-23_13-14-27/checkpoints/last.ckpt \
+    +logger.wandb.id=000i86bo \
+    +logger.wandb.resume=must
