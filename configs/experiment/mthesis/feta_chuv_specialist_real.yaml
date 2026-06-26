@@ -61,7 +61,7 @@ data:
       seg_suffix:     rec-mial_dseg
 
   label_map_csv: /home/danielaco/Documents/segsynthtemplate/label_map_multiprotocol.csv
-  num_workers: 1
+  num_workers: 2
   batch_size: 2
 
 logger:

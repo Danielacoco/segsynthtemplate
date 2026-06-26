@@ -341,6 +341,8 @@ class MultiProtocolDataModule(L.LightningDataModule):
         return train_entries, val_entries, test_entries
 
     def train_dataloader(self):
+        multiproc = {"multiprocessing_context": "spawn"} if self.num_workers > 0 else {}
+        persistent = self.num_workers > 0
         if self.balanced_sampling:
             ds_sizes: dict[int, int] = {}
             for ds_idx, _ in self.train_ds.sample_index:
@@ -352,26 +354,29 @@ class MultiProtocolDataModule(L.LightningDataModule):
                 batch_size=self.batch_size,
                 sampler=sampler,
                 num_workers=self.num_workers,
-                multiprocessing_context="spawn",
-                persistent_workers=True,
+                pin_memory=self.num_workers > 0,
+                persistent_workers=persistent,
+                **multiproc,
             )
         return DataLoader(
             self.train_ds,
             batch_size=self.batch_size,
             shuffle=True,
             num_workers=self.num_workers,
-            multiprocessing_context="spawn",
-            persistent_workers=True,
+            pin_memory=self.num_workers > 0,
+            persistent_workers=persistent,
+            **multiproc,
         )
 
     def val_dataloader(self):
+        multiproc = {"multiprocessing_context": "spawn"} if self.num_workers > 0 else {}
         return DataLoader(
             self.val_ds,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
-            pin_memory=True,
-            multiprocessing_context="spawn",
-            persistent_workers=True,
+            pin_memory=self.num_workers > 0,
+            persistent_workers=self.num_workers > 0,
+            **multiproc,
         )
 
     def test_dataloader(self):

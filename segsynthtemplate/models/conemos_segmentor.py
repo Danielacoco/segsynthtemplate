@@ -22,67 +22,81 @@ from torchmetrics import MaxMetric, MeanMetric
 # Loss helpers
 # ---------------------------------------------------------------------------
 
-def _masked_ce_loss(
+def _mask_logits(
     logits: torch.Tensor,
-    labels: torch.Tensor,
     ann_mask: torch.Tensor,
 ) -> torch.Tensor:
-    """Cross-entropy loss with protocol-conditioned softmax masking.
+    """Set unannotated fg channels to -inf without cloning the logit tensor.
 
-    Unannotated fg channel logits are set to -inf before CE computes its
-    internal softmax, so the probability mass is only distributed among the
-    classes this protocol actually annotates.  Background (channel 0) is
-    always included.
+    Uses ``masked_fill`` which creates a new tensor via a simple boolean
+    select — no clone in the autograd graph, cleaner backward pass.
 
     Args:
         logits:   (B, num_fg_channels + 1, H, W, D) raw network output.
-        labels:   (B, 1, H, W, D) integer targets; 0 = background.
         ann_mask: (B, num_fg_channels) bool — True = channel is annotated.
+    Returns:
+        New tensor with unannotated fg channels set to -inf.
+    """
+    B = logits.shape[0]
+    # prepend True for background channel (always kept)
+    full_mask = torch.cat(
+        [torch.ones(B, 1, dtype=torch.bool, device=logits.device), ann_mask], dim=1
+    )  # (B, num_fg_channels + 1)
+    return logits.masked_fill(~full_mask.view(B, -1, 1, 1, 1), float("-inf"))
+
+
+def _masked_ce_loss(
+    masked_logits: torch.Tensor,
+    labels: torch.Tensor,
+) -> torch.Tensor:
+    """Cross-entropy loss on already-masked logits.
+
+    Args:
+        masked_logits: Output of ``_mask_logits`` — unannotated channels
+            already set to -inf.
+        labels: (B, 1, H, W, D) integer targets; 0 = background.
     Returns:
         Scalar CE loss.
     """
-    masked = logits.clone()
-    # logits[:, 0] = background (always valid); logits[:, 1:] = fg channels
-    # ann_mask[:, c] corresponds to logits[:, c + 1]
-    unannotated = ~ann_mask                            # (B, num_fg_channels)
-    masked[:, 1:][unannotated] = float("-inf")
-    return F.cross_entropy(masked, labels.squeeze(1).long())
+    return F.cross_entropy(masked_logits, labels.squeeze(1).long())
 
 
-def _dice_from_logits(
-    logits: torch.Tensor,
+def _dice_from_preds(
+    preds: torch.Tensor,
     labels: torch.Tensor,
     ann_mask: torch.Tensor,
     eps: float = 1e-5,
 ) -> torch.Tensor:
-    """Hard Dice over annotated fg channels, computed from argmax of logits.
+    """Hard Dice over annotated fg channels from pre-computed argmax predictions.
+
+    Vectorised over all channels simultaneously — no Python for-loop.
 
     Args:
-        logits:   (B, num_fg_channels + 1, H, W, D).
+        preds:    (B, 1, H, W, D) argmax predictions (integer channel indices).
         labels:   (B, 1, H, W, D) integer targets.
         ann_mask: (B, num_fg_channels) bool.
     Returns:
         Scalar mean Dice over annotated (sample, channel) pairs.
     """
-    # Mask unannotated channels to -inf before argmax so they cannot win.
-    masked = logits.clone()
-    unannotated = ~ann_mask                        # (B, num_fg)
-    masked[:, 1:][unannotated] = float("-inf")
-    preds = masked.argmax(dim=1, keepdim=True)    # (B, 1, H, W, D)
     B, num_fg = ann_mask.shape
-    dice_sum   = torch.tensor(0.0, device=logits.device)
-    count      = torch.tensor(0,   device=logits.device)
-    for c in range(1, num_fg + 1):                # fg channels are 1-indexed
-        mask_c = ann_mask[:, c - 1]               # (B,) bool
-        if not mask_c.any():
-            continue
-        pred_c = (preds[mask_c] == c).float().view(mask_c.sum(), -1)
-        tgt_c  = (labels[mask_c] == c).float().view(mask_c.sum(), -1)
-        inter  = (pred_c * tgt_c).sum(-1)
-        denom  = pred_c.sum(-1) + tgt_c.sum(-1)
-        dice_sum += (2.0 * inter / (denom + eps)).sum()
-        count    += mask_c.sum()
-    return dice_sum / count.clamp(min=1)
+    c_idx  = torch.arange(1, num_fg + 1, device=preds.device)   # (num_fg,)
+    pred_oh = (preds  == c_idx.view(1, num_fg, 1, 1, 1)).float()  # (B, num_fg, H, W, D)
+    tgt_oh  = (labels == c_idx.view(1, num_fg, 1, 1, 1)).float()
+    inter   = (pred_oh * tgt_oh).sum(dim=(-3, -2, -1))            # (B, num_fg)
+    denom   = pred_oh.sum(dim=(-3, -2, -1)) + tgt_oh.sum(dim=(-3, -2, -1))
+    dice    = (2.0 * inter / (denom + eps)) * ann_mask            # zero unannotated
+    return dice.sum() / ann_mask.sum().clamp(min=1)
+
+
+def _dice_from_logits(
+    masked_logits: torch.Tensor,
+    labels: torch.Tensor,
+    ann_mask: torch.Tensor,
+    eps: float = 1e-5,
+) -> torch.Tensor:
+    """Hard Dice over annotated fg channels from already-masked logits."""
+    preds = masked_logits.argmax(dim=1, keepdim=True)
+    return _dice_from_preds(preds, labels, ann_mask, eps)
 
 
 # ---------------------------------------------------------------------------
@@ -217,11 +231,12 @@ class CoNeMOSSegmentor(LightningModule):
         proto_idx = protocol_vec.argmax(dim=1)           # (B,)
         ann_mask  = self.annotation_mask[proto_idx]      # (B, num_fg_channels) bool
 
-        logits = self.net(images, protocol_vec)          # (B, num_fg_channels+1, H, W, D)
-        loss   = _masked_ce_loss(logits, labels, ann_mask)
+        logits        = self.net(images, protocol_vec)          # (B, num_fg_channels+1, H, W, D)
+        masked_logits = _mask_logits(logits, ann_mask)
+        loss          = _masked_ce_loss(masked_logits, labels)
 
         self.train_loss(loss)
-        self.train_dice(_dice_from_logits(logits.detach(), labels, ann_mask))
+        self.train_dice(_dice_from_logits(masked_logits.detach(), labels, ann_mask))
         self.log("train/loss", self.train_loss, on_step=True, on_epoch=True,
                  prog_bar=True)
         self.log("train/dice", self.train_dice, on_step=False, on_epoch=True)
@@ -244,16 +259,18 @@ class CoNeMOSSegmentor(LightningModule):
         proto_idx = protocol_vec.argmax(dim=1)
         ann_mask  = self.annotation_mask[proto_idx]
 
-        logits = self.net(images, protocol_vec)
+        logits        = self.net(images, protocol_vec)
+        masked_logits = _mask_logits(logits, ann_mask)
+        preds         = masked_logits.argmax(dim=1, keepdim=True)  # (B, 1, H, W, D)
 
-        self.val_loss(_masked_ce_loss(logits, labels, ann_mask))
-        self.val_dice(_dice_from_logits(logits, labels, ann_mask))
+        self.val_loss(_masked_ce_loss(masked_logits, labels))
+        self.val_dice(_dice_from_preds(preds, labels, ann_mask))
 
         pnames = batch["protocol_name"]
         if isinstance(pnames, str):
             pnames = [pnames]
         for b, pname in enumerate(pnames):
-            dice_b = _dice_from_logits(logits[b:b+1], labels[b:b+1], ann_mask[b:b+1])
+            dice_b = _dice_from_preds(preds[b:b+1], labels[b:b+1], ann_mask[b:b+1])
             self.val_dice_per_protocol[pname](dice_b)
 
     def on_validation_epoch_end(self) -> None:
@@ -279,20 +296,22 @@ class CoNeMOSSegmentor(LightningModule):
         labels       = batch["label"]
         protocol_vec = batch["protocol_vec"]
 
-        proto_idx = protocol_vec.argmax(dim=1)
-        ann_mask  = self.annotation_mask[proto_idx]
-        logits    = self.net(images, protocol_vec)
+        proto_idx     = protocol_vec.argmax(dim=1)
+        ann_mask      = self.annotation_mask[proto_idx]
+        logits        = self.net(images, protocol_vec)
+        masked_logits = _mask_logits(logits, ann_mask)
+        preds         = masked_logits.argmax(dim=1, keepdim=True)
 
-        self.log("test/loss", _masked_ce_loss(logits, labels, ann_mask),
+        self.log("test/loss", _masked_ce_loss(masked_logits, labels),
                  on_step=False, on_epoch=True)
-        self.log("test/dice", _dice_from_logits(logits, labels, ann_mask),
+        self.log("test/dice", _dice_from_preds(preds, labels, ann_mask),
                  on_step=False, on_epoch=True)
 
         pnames = batch["protocol_name"]
         if isinstance(pnames, str):
             pnames = [pnames]
         for b, pname in enumerate(pnames):
-            dice_b = _dice_from_logits(logits[b:b+1], labels[b:b+1], ann_mask[b:b+1])
+            dice_b = _dice_from_preds(preds[b:b+1], labels[b:b+1], ann_mask[b:b+1])
             self.log(f"test/dice_{pname}", dice_b, on_step=False, on_epoch=True)
 
     # ------------------------------------------------------------------

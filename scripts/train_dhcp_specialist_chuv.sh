@@ -5,9 +5,9 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=crro.daniela@gmail.com
 #SBATCH --account=rad
-#SBATCH --partition=rad2
-#SBATCH --qos=16cpu
-#SBATCH --gres=gpu:rtx6000:1
+#SBATCH --partition=rad1
+#SBATCH --qos=8cpu
+#SBATCH --gres=gpu:v100:1
 #SBATCH --gres-flags=enforce-binding
 #SBATCH --mem=64G
 #SBATCH --cpus-per-task=8
@@ -34,7 +34,7 @@ python /cluster/home/da3999/projects/segsynthtemplate/segsynthtemplate/train.py 
     data.generator.device=cuda:0 \
     logger.wandb.project=mthesis \
     logger.wandb.name=dhcp_specialist_conemos \
-    +resume_from=/cluster/home/da3999/None/logs/dhcp_specialist_conemos/runs/2026-06-21_11-42-43/checkpoints/last.ckpt \
+    +resume_from=/cluster/home/da3999/None/logs/dhcp_specialist_conemos/runs/2026-06-23_13-52-35/checkpoints/last.ckpt \
     +logger.wandb.id=y5ejjwpl \
     +logger.wandb.resume=must
     

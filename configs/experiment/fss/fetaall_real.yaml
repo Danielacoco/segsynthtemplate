@@ -21,11 +21,11 @@ data:
   train_type: real # "synth", "real"
   val_type: real # "synth", "real"
 
-  # generator:
-  #   simulate_motion: null
-  #   boundaries: null
-  #   struct_noise: null
-  #   blur_cortex: null
+  generator:
+    simulate_motion: null
+    boundaries: null
+    struct_noise: null
+    blur_cortex: null
 
   split_file: /media/danielaco/HDD2TB/DataDaniela/feta_2.4/splits.csv
   bids_path: /media/danielaco/HDD2TB/DataDaniela/feta_2.4/
